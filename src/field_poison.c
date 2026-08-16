@@ -7,6 +7,7 @@
 #include "field_poison.h"
 #include "fldeff_misc.h"
 #include "frontier_util.h"
+#include "nuzlocke.h"
 #include "party_menu.h"
 #include "pokenav.h"
 #include "script.h"
@@ -45,6 +46,8 @@ static void FaintFromFieldPoison(u8 partyIdx)
     u32 status = STATUS1_NONE;
 
     AdjustFriendship(pokemon, FRIENDSHIP_EVENT_FAINT_FIELD_PSN);
+    // Nuzlocke: fainting to field poison counts the same as fainting in battle.
+    MarkMonAsNuzlockeDead(pokemon);
     SetMonData(pokemon, MON_DATA_STATUS, &status);
     GetMonData(pokemon, MON_DATA_NICKNAME, gStringVar1);
     StringGet_Nickname(gStringVar1);

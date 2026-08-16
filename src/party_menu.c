@@ -39,6 +39,7 @@
 #include "menu_helpers.h"
 #include "menu_specialized.h"
 #include "metatile_behavior.h"
+#include "nuzlocke.h"
 #include "overworld.h"
 #include "palette.h"
 #include "party_menu.h"
@@ -5813,7 +5814,12 @@ static bool8 TrySwitchInPokemon(void)
     if (GetMonData(&gPlayerParty[slot], MON_DATA_HP) == 0)
     {
         GetMonNickname(&gPlayerParty[slot], gStringVar1);
-        StringExpandPlaceholders(gStringVar4, gText_PkmnHasNoEnergy);
+        // Nuzlocke: distinguish "fainted, will recover" from "dead for good",
+        // so the player understands why this one never comes back.
+        if (IsMonNuzlockeDead(&gPlayerParty[slot]))
+            StringExpandPlaceholders(gStringVar4, gText_PkmnIsGoneForever);
+        else
+            StringExpandPlaceholders(gStringVar4, gText_PkmnHasNoEnergy);
         return FALSE;
     }
     for (i = 0; i < gBattlersCount; i++)

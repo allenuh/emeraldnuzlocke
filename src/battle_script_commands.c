@@ -29,6 +29,7 @@
 #include "task.h"
 #include "naming_screen.h"
 #include "battle_setup.h"
+#include "nuzlocke.h"
 #include "overworld.h"
 #include "party_menu.h"
 #include "battle_arena.h"
@@ -3010,6 +3011,11 @@ static void Cmd_tryfaintmon(void)
                 if (gBattleResults.playerFaintCounter < 255)
                     gBattleResults.playerFaintCounter++;
                 AdjustFriendshipOnBattleFaint(gActiveBattler);
+                // Nuzlocke: this Pokémon is dead for good. Marked immediately
+                // rather than at battle end so the party menu reflects it while
+                // the player is still choosing a replacement.
+                if (!(gBattleTypeFlags & BATTLE_TYPE_LINK))
+                    MarkMonAsNuzlockeDead(&gPlayerParty[gBattlerPartyIndexes[gActiveBattler]]);
             }
             else
             {

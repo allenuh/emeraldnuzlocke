@@ -11,6 +11,7 @@
 #include "link_rfu.h"
 #include "main.h"
 #include "menu.h"
+#include "nuzlocke.h"
 #include "overworld.h"
 #include "palette.h"
 #include "party_menu.h"
@@ -36,7 +37,15 @@ void HealPlayerParty(void)
     // restore HP.
     for(i = 0; i < gPlayerPartyCount; i++)
     {
-        u16 maxHP = GetMonData(&gPlayerParty[i], MON_DATA_MAX_HP);
+        u16 maxHP;
+
+        // Nuzlocke: the Pokémon Center can't do anything for the dead. The HP
+        // write would be pinned to 0 anyway, but skipping the whole mon also
+        // stops its status being cleared and its PP refilled.
+        if (IsMonNuzlockeDead(&gPlayerParty[i]))
+            continue;
+
+        maxHP = GetMonData(&gPlayerParty[i], MON_DATA_MAX_HP);
         arg[0] = maxHP;
         arg[1] = maxHP >> 8;
         SetMonData(&gPlayerParty[i], MON_DATA_HP, arg);

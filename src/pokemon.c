@@ -18,6 +18,7 @@
 #include "main.h"
 #include "overworld.h"
 #include "m4a.h"
+#include "nuzlocke.h"
 #include "party_menu.h"
 #include "pokedex.h"
 #include "pokeblock.h"
@@ -2892,6 +2893,12 @@ void CalculateMonStats(struct Pokemon *mon)
         }
     }
 
+    // Nuzlocke: closes the vanilla quirk where boxing a fainted Pokémon and
+    // withdrawing it heals to full. BoxMonToMon zeroes maxHP first, so a dead
+    // mon lands in the currentHP == 0 && oldMaxHP == 0 branch above.
+    if (IsMonNuzlockeDead(mon))
+        currentHP = 0;
+
     SetMonData(mon, MON_DATA_HP, &currentHP);
 }
 
@@ -3986,6 +3993,9 @@ u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
     case MON_DATA_UNUSED_RIBBONS:
         retVal = substruct3->unusedRibbons;
         break;
+    case MON_DATA_NUZLOCKE_DEAD:
+        retVal = substruct3->nuzlockeDead;
+        break;
     case MON_DATA_MODERN_FATEFUL_ENCOUNTER:
         retVal = substruct3->modernFatefulEncounter;
         break;
@@ -4116,6 +4126,12 @@ void SetMonData(struct Pokemon *mon, s32 field, const void *dataArg)
         break;
     case MON_DATA_HP:
         SET16(mon->hp);
+        // Nuzlocke: a Pokémon that has died can never regain HP by any means.
+        // This is the single choke point every HP write in the game passes
+        // through, so pinning it here is what makes the rule airtight.
+        // Testing hp first keeps damage-to-zero writes off the decrypt path.
+        if (mon->hp != 0 && IsMonNuzlockeDead(mon))
+            mon->hp = 0;
         break;
     case MON_DATA_MAX_HP:
         SET16(mon->maxHP);
@@ -4391,6 +4407,9 @@ void SetBoxMonData(struct BoxPokemon *boxMon, s32 field, const void *dataArg)
         break;
     case MON_DATA_UNUSED_RIBBONS:
         SET8(substruct3->unusedRibbons);
+        break;
+    case MON_DATA_NUZLOCKE_DEAD:
+        SET8(substruct3->nuzlockeDead);
         break;
     case MON_DATA_MODERN_FATEFUL_ENCOUNTER:
         SET8(substruct3->modernFatefulEncounter);
@@ -4770,6 +4789,13 @@ bool8 PokemonUseItemEffects(struct Pokemon *mon, u16 item, u8 partyIndex, u8 mov
     u8 effectFlags;
     s8 evChange;
     u16 evCount;
+
+    // Nuzlocke: nothing works on a dead Pokémon. Returning early reports "It
+    // won't have any effect." and leaves the item unconsumed, rather than
+    // silently eating a Revive. Blocking non-healing items too is deliberate:
+    // a dead mon shouldn't be trainable either.
+    if (IsMonNuzlockeDead(mon))
+        return TRUE;
 
     // Get item hold effect
     heldItem = GetMonData(mon, MON_DATA_HELD_ITEM, NULL);

@@ -29,6 +29,7 @@
 #include "main.h"
 #include "malloc.h"
 #include "m4a.h"
+#include "nuzlocke.h"
 #include "palette.h"
 #include "party_menu.h"
 #include "pokeball.h"
@@ -5220,6 +5221,10 @@ static void ReturnFromBattleToOverworld(void)
     {
         RandomlyGivePartyPokerus(gPlayerParty);
         PartySpreadPokerus(gPlayerParty);
+        // Nuzlocke: safety net for faint paths that skip Cmd_tryfaintmon
+        // (Destiny Bond, Perish Song, the self-KO cases). Anything still at
+        // 0 HP now went down during this battle.
+        NuzlockeMarkFaintedPartyMons();
     }
 
     if (gBattleTypeFlags & BATTLE_TYPE_LINK && gReceivedRemoteLinkPlayers)
