@@ -9,6 +9,7 @@
 #include "item.h"
 #include "util.h"
 #include "battle_scripts.h"
+#include "nuzlocke.h"
 #include "random.h"
 #include "text.h"
 #include "safari_zone.h"
@@ -552,6 +553,18 @@ void HandleAction_SafariZoneBallThrow(void)
     gBattlerAttacker = gBattlerByTurnOrder[gCurrentTurnActionNumber];
     gBattle_BG0_X = 0;
     gBattle_BG0_Y = 0;
+
+    // Nuzlocke rules 3 & 4: Safari throws come through the battle menu rather
+    // than the bag, so they are refused here -- before the counter drops, so a
+    // blocked throw costs nothing.
+    if (!CanThrowBallAtCurrentEncounter())
+    {
+        gBattleCommunication[MULTISTRING_CHOOSER] = NuzlockePrepareBallBlockMessage();
+        gBattlescriptCurrInstr = BattleScript_NuzlockeBallBlock;
+        gCurrentActionFuncId = B_ACTION_EXEC_SCRIPT;
+        return;
+    }
+
     gNumSafariBalls--;
     gLastUsedItem = ITEM_SAFARI_BALL;
     gBattlescriptCurrInstr = gBattlescriptsForBallThrow[ITEM_SAFARI_BALL];

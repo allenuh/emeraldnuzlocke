@@ -378,8 +378,11 @@
 #define STRINGID_PKMNBOXLANETTESPCFULL      378
 #define STRINGID_TRAINER1WINTEXT            379
 #define STRINGID_TRAINER2WINTEXT            380
+// Nuzlocke rules 3 & 4: why a ball throw was refused.
+#define STRINGID_NUZLOCKEAREASPENT          381
+#define STRINGID_NUZLOCKEDUPLICATE          382
 
-#define BATTLESTRINGS_COUNT                 381
+#define BATTLESTRINGS_COUNT                 383
 
 // This is the string id that gBattleStringsTable starts with.
 // String ids before this (e.g. STRINGID_INTROMSG) are not in the table,
@@ -533,6 +536,10 @@
 #define B_MSG_SENT_LANETTES_PC  1
 #define B_MSG_SOMEONES_BOX_FULL 2
 #define B_MSG_LANETTES_BOX_FULL 3
+
+// gNuzlockeBallBlockStringIds
+#define B_MSG_NUZLOCKE_AREA_SPENT 0
+#define B_MSG_NUZLOCKE_DUPLICATE  1
 
 // gInobedientStringIds
 #define B_MSG_LOAFING            0

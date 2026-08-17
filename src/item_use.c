@@ -23,6 +23,8 @@
 #include "mail.h"
 #include "main.h"
 #include "menu.h"
+#include "nuzlocke.h"
+#include "constants/battle_string_ids.h"
 #include "menu_helpers.h"
 #include "metatile_behavior.h"
 #include "overworld.h"
@@ -937,7 +939,21 @@ void ItemUseOutOfBattle_EvolutionStone(u8 taskId)
 
 void ItemUseInBattle_PokeBall(u8 taskId)
 {
-    if (IsPlayerPartyAndPokemonStorageFull() == FALSE) // have room for mon?
+    // Nuzlocke rules 3 & 4: refuse before RemoveBagItem so a blocked throw
+    // never costs a ball.
+    if (!CanThrowBallAtCurrentEncounter())
+    {
+        const u8 *text = (NuzlockePrepareBallBlockMessage() == B_MSG_NUZLOCKE_DUPLICATE)
+                       ? gText_NuzlockeDuplicate
+                       : gText_NuzlockeAreaSpent;
+
+        StringExpandPlaceholders(gStringVar4, text);
+        if (CurrentBattlePyramidLocation() == PYRAMID_LOCATION_NONE)
+            DisplayItemMessage(taskId, FONT_NORMAL, gStringVar4, CloseItemMessage);
+        else
+            DisplayItemMessageInBattlePyramid(taskId, gStringVar4, Task_CloseBattlePyramidBagMessage);
+    }
+    else if (IsPlayerPartyAndPokemonStorageFull() == FALSE) // have room for mon?
     {
         RemoveBagItem(gSpecialVar_ItemId, 1);
         if (CurrentBattlePyramidLocation() == PYRAMID_LOCATION_NONE)

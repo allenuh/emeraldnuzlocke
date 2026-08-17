@@ -16,6 +16,10 @@
 #include "constants/pokemon.h"
 #include "constants/easy_chat.h"
 #include "constants/trainer_hill.h"
+#include "constants/region_map_sections.h" // for NUZLOCKE_AREA_BYTES below
+
+// Nuzlocke rule 3: one bit per region map section in SaveBlock1.
+#define NUZLOCKE_AREA_BYTES ((MAPSEC_COUNT + 7) / 8)
 
 // Prevent cross-jump optimization.
 #define BLOCK_CROSS_JUMP asm("");
@@ -1064,7 +1068,12 @@ struct SaveBlock1
     /*0x31DC*/ struct Roamer roamer;
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
-    /*0x3598*/ u8 unused_3598[0x180];
+    // Nuzlocke rule 3: one bit per region map section, set once that area's
+    // single catch opportunity has been used up. Carved out of what was
+    // unused_3598[0x180]; the two fields still total 0x180 so every offset
+    // below is unchanged and existing save files stay valid.
+    /*0x3598*/ u8 nuzlockeAreaEncounterSpent[NUZLOCKE_AREA_BYTES];
+    /*0x35B3*/ u8 unused_35B3[0x180 - NUZLOCKE_AREA_BYTES];
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

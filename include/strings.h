@@ -507,6 +507,8 @@ extern const u8 gText_CancelChallenge[];
 extern const u8 gText_CantSwitchWithAlly[];
 extern const u8 gText_PkmnHasNoEnergy[];
 extern const u8 gText_PkmnIsGoneForever[];
+extern const u8 gText_NuzlockeAreaSpent[];
+extern const u8 gText_NuzlockeDuplicate[];
 extern const u8 gText_EggCantBattle[];
 extern const u8 gText_PkmnAlreadySelected[];
 extern const u8 gText_PkmnAlreadyInBattle[];

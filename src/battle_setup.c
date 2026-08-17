@@ -25,6 +25,7 @@
 #include "trainer_hill.h"
 #include "secret_base.h"
 #include "string_util.h"
+#include "nuzlocke.h"
 #include "overworld.h"
 #include "field_weather.h"
 #include "battle_tower.h"
@@ -388,6 +389,11 @@ static void CreateBattleStartTask(u8 transition, u16 song)
 
 void BattleSetup_StartWildBattle(void)
 {
+    // Nuzlocke rules 3 & 4: only encounters generated from a route's encounter
+    // table reach this function, which is exactly the set the rule governs.
+    // Scripted and legendary battles start elsewhere and stay exempt.
+    NuzlockeEvaluateWildEncounter();
+
     if (GetSafariZoneFlag())
         DoSafariBattle();
     else

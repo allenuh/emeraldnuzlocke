@@ -9918,6 +9918,16 @@ static void Cmd_handleballthrow(void)
     gActiveBattler = gBattlerAttacker;
     gBattlerTarget = BATTLE_OPPOSITE(gBattlerAttacker);
 
+    // Nuzlocke rules 3 & 4: backstop. Both the bag and the Safari menu refuse
+    // earlier so no ball is wasted, but every ball throw converges here, so
+    // this guarantees no path can slip past the rule.
+    if (!CanThrowBallAtCurrentEncounter())
+    {
+        gBattleCommunication[MULTISTRING_CHOOSER] = NuzlockePrepareBallBlockMessage();
+        gBattlescriptCurrInstr = BattleScript_NuzlockeBallBlock;
+        return;
+    }
+
     if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
     {
         BtlController_EmitBallThrowAnim(B_COMM_TO_CONTROLLER, BALL_TRAINER_BLOCK);

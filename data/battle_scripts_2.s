@@ -110,6 +110,14 @@ BattleScript_TrainerBallBlock::
 	waitmessage B_WAIT_TIME_LONG
 	finishaction
 
+@ Nuzlocke rules 3 & 4: the throw is refused before any ball is spent, so no
+@ throw animation is played. The reason comes from gBattleCommunication.
+BattleScript_NuzlockeBallBlock::
+	waitmessage B_WAIT_TIME_LONG
+	printfromtable gNuzlockeBallBlockStringIds
+	waitmessage B_WAIT_TIME_LONG
+	finishaction
+
 BattleScript_PlayerUsesItem::
 	moveendcase MOVEEND_MIRROR_MOVE
 	end

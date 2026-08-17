@@ -463,6 +463,10 @@ static const u8 sText_WallyUsedItem[] = _("WALLY used\n{B_LAST_ITEM}!");
 static const u8 sText_Trainer1UsedItem[] = _("{B_TRAINER1_CLASS} {B_TRAINER1_NAME}\nused {B_LAST_ITEM}!");
 static const u8 sText_TrainerBlockedBall[] = _("The TRAINER blocked the BALL!");
 static const u8 sText_DontBeAThief[] = _("Don't be a thief!");
+// Nuzlocke rules 3 & 4. B_COPY_VAR_1 pulls in gStringVar1, which holds the
+// area name buffered by GetMapName.
+static const u8 sText_NuzlockeAreaSpent[] = _("You already had your chance\nat {B_COPY_VAR_1}!");
+static const u8 sText_NuzlockeDuplicate[] = _("You already own a {B_COPY_VAR_1}!\nKeep looking for a new one!");
 static const u8 sText_ItDodgedBall[] = _("It dodged the thrown BALL!\nThis POKéMON can't be caught!");
 static const u8 sText_YouMissedPkmn[] = _("You missed the POKéMON!");
 static const u8 sText_PkmnBrokeFree[] = _("Oh, no!\nThe POKéMON broke free!");
@@ -885,6 +889,15 @@ const u8 *const gBattleStringsTable[BATTLESTRINGS_COUNT - BATTLESTRINGS_TABLE_ST
     [STRINGID_PKMNBOXLANETTESPCFULL - BATTLESTRINGS_TABLE_START] = gText_PkmnTransferredLanettesPCBoxFull,
     [STRINGID_TRAINER1WINTEXT - BATTLESTRINGS_TABLE_START] = sText_Trainer1WinText,
     [STRINGID_TRAINER2WINTEXT - BATTLESTRINGS_TABLE_START] = sText_Trainer2WinText,
+    [STRINGID_NUZLOCKEAREASPENT - BATTLESTRINGS_TABLE_START] = sText_NuzlockeAreaSpent,
+    [STRINGID_NUZLOCKEDUPLICATE - BATTLESTRINGS_TABLE_START] = sText_NuzlockeDuplicate,
+};
+
+// Nuzlocke rules 3 & 4: which refusal message a blocked ball throw prints.
+const u16 gNuzlockeBallBlockStringIds[] =
+{
+    [B_MSG_NUZLOCKE_AREA_SPENT] = STRINGID_NUZLOCKEAREASPENT,
+    [B_MSG_NUZLOCKE_DUPLICATE]  = STRINGID_NUZLOCKEDUPLICATE,
 };
 
 const u16 gMissStringIds[] =

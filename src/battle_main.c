@@ -5225,6 +5225,9 @@ static void ReturnFromBattleToOverworld(void)
         // (Destiny Bond, Perish Song, the self-KO cases). Anything still at
         // 0 HP now went down during this battle.
         NuzlockeMarkFaintedPartyMons();
+        // Nuzlocke rule 3: consume this area's catch opportunity, if the
+        // encounter was the one that counted.
+        NuzlockeFinishWildEncounter();
     }
 
     if (gBattleTypeFlags & BATTLE_TYPE_LINK && gReceivedRemoteLinkPlayers)
