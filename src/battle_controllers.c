@@ -7,6 +7,7 @@
 #include "cable_club.h"
 #include "link.h"
 #include "link_rfu.h"
+#include "nuzlocke.h"
 #include "party_menu.h"
 #include "recorded_battle.h"
 #include "task.h"
@@ -585,6 +586,11 @@ static void InitLinkBtlControllers(void)
 static void SetBattlePartyIds(void)
 {
     s32 i, j;
+    // Nuzlocke rule 7: don't lead with a Pokémon that is over the level cap.
+    // Checked once, up front: if the player somehow has nothing legal left, the
+    // cap is ignored rather than leaving gBattlerPartyIndexes pointing at stale
+    // data, which would be far worse than an illegal lead.
+    bool32 benchOverCapMons = NuzlockeLevelCapAppliesToBattle() && NuzlockePartyHasMonUnderLevelCap();
 
     if (!(gBattleTypeFlags & BATTLE_TYPE_MULTI))
     {
@@ -599,7 +605,8 @@ static void SetBattlePartyIds(void)
                         if (GetMonData(&gPlayerParty[j], MON_DATA_HP) != 0
                          && GetMonData(&gPlayerParty[j], MON_DATA_SPECIES_OR_EGG) != SPECIES_NONE
                          && GetMonData(&gPlayerParty[j], MON_DATA_SPECIES_OR_EGG) != SPECIES_EGG
-                         && !GetMonData(&gPlayerParty[j], MON_DATA_IS_EGG))
+                         && !GetMonData(&gPlayerParty[j], MON_DATA_IS_EGG)
+                         && !(benchOverCapMons && IsMonOverLevelCap(&gPlayerParty[j])))
                         {
                             gBattlerPartyIndexes[i] = j;
                             break;
@@ -625,6 +632,7 @@ static void SetBattlePartyIds(void)
                          && GetMonData(&gPlayerParty[j], MON_DATA_SPECIES) != SPECIES_NONE  // Probably a typo by Game Freak. The rest use SPECIES2.
                          && GetMonData(&gPlayerParty[j], MON_DATA_SPECIES_OR_EGG) != SPECIES_EGG
                          && !GetMonData(&gPlayerParty[j], MON_DATA_IS_EGG)
+                         && !(benchOverCapMons && IsMonOverLevelCap(&gPlayerParty[j]))
                          && gBattlerPartyIndexes[i - 2] != j)
                         {
                             gBattlerPartyIndexes[i] = j;

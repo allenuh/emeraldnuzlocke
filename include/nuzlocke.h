@@ -46,4 +46,32 @@ u8 NuzlockePrepareBallBlockMessage(void);
 // Called once a battle is over: consumes the area's chance if it was used.
 void NuzlockeFinishWildEncounter(void);
 
+// Nuzlocke rule 7: no Pokémon may be raised past the level of the next boss
+// trainer's strongest Pokémon.
+//
+// Enforcement is mostly by refusal rather than punishment: a Pokémon standing on
+// the cap simply earns nothing, and the experience it would have taken is handed
+// to a party member that still has room. Only a Pokémon *obtained* above the cap
+// (a Lv 70 Rayquaza caught while the cap is 55) has to be benched, and that
+// cannot ride rule 1's "HP pinned at 0" trick without killing it for good, so it
+// needs explicit checks at the few places a Pokémon is sent out.
+//
+// The cap is derived entirely from flags that already exist, so no save data was
+// added for this rule.
+u8 NuzlockeGetLevelCap(void);
+bool32 IsMonOverLevelCap(struct Pokemon *mon);
+bool32 NuzlockePartyHasMonUnderLevelCap(void);
+bool32 NuzlockeLevelCapAppliesToBattle(void);
+
+// Truncates an experience total so it cannot represent a level past the cap.
+// Takes a species rather than a Pokémon so it serves boxed ones too.
+u32 NuzlockeClampExpToLevelCap(u16 species, u32 exp);
+
+// Decides, in one pass over the party, exactly how much experience each slot
+// takes from a knockout -- including the redirect away from capped Pokémon.
+// Call once per knockout, then read the result back per slot.
+void NuzlockeComputeExpAwards(u32 participantExp, u32 shareExp, u32 sentInPokes);
+u16 NuzlockeGetExpAward(u8 partySlot);
+bool32 NuzlockeMonEarnedExpNormally(u8 partySlot, u32 sentInPokes);
+
 #endif // GUARD_NUZLOCKE_H

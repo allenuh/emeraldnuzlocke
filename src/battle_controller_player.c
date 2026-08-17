@@ -15,6 +15,7 @@
 #include "link.h"
 #include "main.h"
 #include "m4a.h"
+#include "nuzlocke.h"
 #include "palette.h"
 #include "party_menu.h"
 #include "pokeball.h"
@@ -2727,7 +2728,9 @@ static void PlayerHandleExpUpdate(void)
 {
     u8 monId = gBattleBufferA[gActiveBattler][1];
 
-    if (GetMonData(&gPlayerParty[monId], MON_DATA_LEVEL) >= MAX_LEVEL)
+    // Nuzlocke rule 7: last line of defence on the exp write itself. Cmd_getexp
+    // should never send exp to a capped Pokémon, but this is where it would land.
+    if (GetMonData(&gPlayerParty[monId], MON_DATA_LEVEL) >= NuzlockeGetLevelCap())
     {
         PlayerBufferExecCompleted();
     }

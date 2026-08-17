@@ -13,6 +13,7 @@
 #include "link.h"
 #include "main.h"
 #include "m4a.h"
+#include "nuzlocke.h"
 #include "palette.h"
 #include "pokeball.h"
 #include "pokemon.h"
@@ -1594,7 +1595,8 @@ static void PlayerPartnerHandleExpUpdate(void)
 {
     u8 monId = gBattleBufferA[gActiveBattler][1];
 
-    if (GetMonData(&gPlayerParty[monId], MON_DATA_LEVEL) >= MAX_LEVEL)
+    // Nuzlocke rule 7: same backstop as the player controller's exp update.
+    if (GetMonData(&gPlayerParty[monId], MON_DATA_LEVEL) >= NuzlockeGetLevelCap())
     {
         PlayerPartnerBufferExecCompleted();
     }

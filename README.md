@@ -30,6 +30,43 @@ Relevant code: [`src/nuzlocke.c`](src/nuzlocke.c), [`include/nuzlocke.h`](includ
 hooks in `src/pokemon.c`, `src/battle_script_commands.c`, `src/battle_main.c`, `src/field_poison.c`,
 `src/party_menu.c`, and `src/script_pokemon_util.c`.
 
+### Level caps
+
+No Pokémon may be raised past the level of the next boss trainer's strongest Pokémon. The cap starts
+at 15 (Roxanne's Nosepass) and rises with each badge — 19, 24, 29, 31, 33, 42, 46 — then sits at 55
+for the whole Pokémon League, since the hardcore rule caps League entry at the *final* Elite Four
+member and there is no way back out to train once the gauntlet starts. Beating the Champion raises
+it to 78 for Steven's rematch in Meteor Falls, after which it is lifted entirely.
+
+**How it works.** Rather than punishing the player for over-levelling after the fact, the cap simply
+refuses the experience. A Pokémon standing on the cap earns nothing, and the exp it would have taken
+is handed to a party member that still has room — whether or not that Pokémon fought. If the whole
+party is capped, the exp is lost. Awards are also clamped, so a Pokémon one level below the cap
+receives exactly enough to land on it and never overshoots.
+
+The whole party's share is worked out in a single pass before any of it is handed out
+(`NuzlockeComputeExpAwards`). Vanilla's exp loop walks the party one slot at a time, so deciding a
+redirect on the fly would mean reaching backwards into slots it had already passed. Settling the
+table up front also means the clamp happens *after* the Lucky Egg, trainer-battle and traded-Pokémon
+multipliers, so a redirect can't quietly push its recipient back over the cap.
+
+Effort values are deliberately left alone: exp moves between Pokémon under this rule, EVs do not.
+Rare Candy and the Day Care are capped too — the Day Care by clamping the experience itself, which
+also keeps its "grew N levels" preview and its price quote honest.
+
+A Pokémon *obtained* above the cap (a Lv 70 Rayquaza caught while the cap is 55) is benched: it
+can't be sent out or switched to, and can't fill the second slot of a double battle, until the cap
+rises past it. Unlike the permadeath rule this can't lean on the HP-pinned-at-0 invariant — that
+would kill it outright — so those refusals are spelled out at the three places a Pokémon gets sent
+into battle. Battle Frontier, Battle Tower and link battles are exempt, as they are for permadeath.
+
+The cap is derived entirely from badge and story flags that already exist, so **no save data was
+added** for this rule.
+
+Relevant code: [`src/nuzlocke.c`](src/nuzlocke.c), with hooks in `src/battle_script_commands.c`
+(`Cmd_getexp`), `src/battle_controllers.c`, `src/battle_controller_player.c`,
+`src/battle_controller_player_partner.c`, `src/party_menu.c`, `src/pokemon.c`, and `src/daycare.c`.
+
 ### Planned
 
 - **Soul Link** — Pokémon caught in the same area are linked; when one dies, its partner dies too.

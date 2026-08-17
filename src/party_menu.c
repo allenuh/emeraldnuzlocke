@@ -4961,7 +4961,9 @@ void ItemUseCB_RareCandy(u8 taskId, TaskFunc task)
     u16 *itemPtr = &gSpecialVar_ItemId;
     bool8 cannotUseEffect;
 
-    if (GetMonData(mon, MON_DATA_LEVEL) != MAX_LEVEL)
+    // Nuzlocke rule 7: at the cap this falls through to gText_WontHaveEffect,
+    // the same refusal a Lv 100 Pokémon already gets.
+    if (GetMonData(mon, MON_DATA_LEVEL) < NuzlockeGetLevelCap())
     {
         BufferMonStatsToTaskData(mon, arrayPtr);
         cannotUseEffect = ExecuteTableBasedItemEffect_(gPartyMenu.slotId, *itemPtr, 0);
@@ -5820,6 +5822,16 @@ static bool8 TrySwitchInPokemon(void)
             StringExpandPlaceholders(gStringVar4, gText_PkmnIsGoneForever);
         else
             StringExpandPlaceholders(gStringVar4, gText_PkmnHasNoEnergy);
+        return FALSE;
+    }
+    // Nuzlocke rule 7: benched until the cap catches up with it. Unlike rule 1
+    // this cannot lean on the HP-pinned-at-0 invariant -- that would kill the
+    // Pokémon outright -- so the refusal is spelled out here instead.
+    if (NuzlockeLevelCapAppliesToBattle() && IsMonOverLevelCap(&gPlayerParty[slot]))
+    {
+        GetMonNickname(&gPlayerParty[slot], gStringVar1);
+        ConvertIntToDecimalStringN(gStringVar2, NuzlockeGetLevelCap(), STR_CONV_MODE_LEFT_ALIGN, 3);
+        StringExpandPlaceholders(gStringVar4, gText_NuzlockeOverLevelCap);
         return FALSE;
     }
     for (i = 0; i < gBattlersCount; i++)

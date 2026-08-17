@@ -3333,6 +3333,12 @@ static void Cmd_getexp(void)
                 gExpShareExp = 0;
             }
 
+            // Nuzlocke rule 7: settle the whole party's awards here, while the
+            // shares are still in hand. Doing it up front is what lets exp be
+            // redirected away from a capped Pokémon to a slot the loop below has
+            // not reached yet -- or has already passed.
+            NuzlockeComputeExpAwards(*exp, gExpShareExp, sentIn);
+
             gBattleScripting.getexpState++;
             gBattleStruct->expGetterMonId = 0;
             gBattleStruct->sentInPokes = sentIn;
@@ -3341,90 +3347,66 @@ static void Cmd_getexp(void)
     case 2: // set exp value to the poke in expgetter_id and print message
         if (gBattleControllerExecFlags == 0)
         {
-            item = GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_HELD_ITEM);
+            // Nuzlocke rule 7: the award was settled back in state 1 --
+            // participation share, Exp Share, every multiplier, the clamp to the
+            // level cap, and anything redirected here from a capped Pokémon. A
+            // recipient of redirected exp may never have fought, so one "did this
+            // slot get anything" test replaces vanilla's separate participation
+            // and MAX_LEVEL skips; either of those would have thrown it away.
+            gBattleMoveDamage = NuzlockeGetExpAward(gBattleStruct->expGetterMonId);
 
-            if (item == ITEM_ENIGMA_BERRY)
-                holdEffect = gSaveBlock1Ptr->enigmaBerry.holdEffect;
-            else
-                holdEffect = GetItemHoldEffect(item);
+            // music change in wild battle after fainting a poke. Hoisted out of
+            // the branch below so the fanfare still plays once the whole party is
+            // sitting on the cap and there is nobody left to take the exp.
+            if (!(gBattleTypeFlags & BATTLE_TYPE_TRAINER) && gBattleMons[0].hp != 0 && !gBattleStruct->wildVictorySong)
+            {
+                BattleStopLowHpSound();
+                PlayBGM(MUS_VICTORY_WILD);
+                gBattleStruct->wildVictorySong++;
+            }
 
-            if (holdEffect != HOLD_EFFECT_EXP_SHARE && !(gBattleStruct->sentInPokes & 1))
+            if (gBattleMoveDamage == 0)
             {
                 *(&gBattleStruct->sentInPokes) >>= 1;
                 gBattleScripting.getexpState = 5;
-                gBattleMoveDamage = 0; // used for exp
-            }
-            else if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) == MAX_LEVEL)
-            {
-                *(&gBattleStruct->sentInPokes) >>= 1;
-                gBattleScripting.getexpState = 5;
-                gBattleMoveDamage = 0; // used for exp
             }
             else
             {
-                // music change in wild battle after fainting a poke
-                if (!(gBattleTypeFlags & BATTLE_TYPE_TRAINER) && gBattleMons[0].hp != 0 && !gBattleStruct->wildVictorySong)
+                // check if the Pokémon doesn't belong to the player
+                if (IsTradedMon(&gPlayerParty[gBattleStruct->expGetterMonId])
+                 && !(gBattleTypeFlags & BATTLE_TYPE_INGAME_PARTNER && gBattleStruct->expGetterMonId >= 3))
+                    i = STRINGID_ABOOSTED;
+                else
+                    i = STRINGID_EMPTYSTRING4;
+
+                // get exp getter battler
+                if (gBattleTypeFlags & BATTLE_TYPE_DOUBLE)
                 {
-                    BattleStopLowHpSound();
-                    PlayBGM(MUS_VICTORY_WILD);
-                    gBattleStruct->wildVictorySong++;
-                }
-
-                if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_HP))
-                {
-                    if (gBattleStruct->sentInPokes & 1)
-                        gBattleMoveDamage = *exp;
-                    else
-                        gBattleMoveDamage = 0;
-
-                    if (holdEffect == HOLD_EFFECT_EXP_SHARE)
-                        gBattleMoveDamage += gExpShareExp;
-                    if (holdEffect == HOLD_EFFECT_LUCKY_EGG)
-                        gBattleMoveDamage = (gBattleMoveDamage * 150) / 100;
-                    if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
-                        gBattleMoveDamage = (gBattleMoveDamage * 150) / 100;
-
-                    if (IsTradedMon(&gPlayerParty[gBattleStruct->expGetterMonId]))
-                    {
-                        // check if the Pokémon doesn't belong to the player
-                        if (gBattleTypeFlags & BATTLE_TYPE_INGAME_PARTNER && gBattleStruct->expGetterMonId >= 3)
-                        {
-                            i = STRINGID_EMPTYSTRING4;
-                        }
-                        else
-                        {
-                            gBattleMoveDamage = (gBattleMoveDamage * 150) / 100;
-                            i = STRINGID_ABOOSTED;
-                        }
-                    }
-                    else
-                    {
-                        i = STRINGID_EMPTYSTRING4;
-                    }
-
-                    // get exp getter battler
-                    if (gBattleTypeFlags & BATTLE_TYPE_DOUBLE)
-                    {
-                        if (gBattlerPartyIndexes[2] == gBattleStruct->expGetterMonId && !(gAbsentBattlerFlags & gBitTable[2]))
-                            gBattleStruct->expGetterBattlerId = 2;
-                        else if (!(gAbsentBattlerFlags & gBitTable[0]))
-                            gBattleStruct->expGetterBattlerId = 0;
-                        else
-                            gBattleStruct->expGetterBattlerId = 2;
-                    }
-                    else
-                    {
+                    if (gBattlerPartyIndexes[2] == gBattleStruct->expGetterMonId && !(gAbsentBattlerFlags & gBitTable[2]))
+                        gBattleStruct->expGetterBattlerId = 2;
+                    else if (!(gAbsentBattlerFlags & gBitTable[0]))
                         gBattleStruct->expGetterBattlerId = 0;
-                    }
-
-                    PREPARE_MON_NICK_WITH_PREFIX_BUFFER(gBattleTextBuff1, gBattleStruct->expGetterBattlerId, gBattleStruct->expGetterMonId);
-                    // buffer 'gained' or 'gained a boosted'
-                    PREPARE_STRING_BUFFER(gBattleTextBuff2, i);
-                    PREPARE_WORD_NUMBER_BUFFER(gBattleTextBuff3, 5, gBattleMoveDamage);
-
-                    PrepareStringBattle(STRINGID_PKMNGAINEDEXP, gBattleStruct->expGetterBattlerId);
-                    MonGainEVs(&gPlayerParty[gBattleStruct->expGetterMonId], gBattleMons[gBattlerFainted].species);
+                    else
+                        gBattleStruct->expGetterBattlerId = 2;
                 }
+                else
+                {
+                    gBattleStruct->expGetterBattlerId = 0;
+                }
+
+                PREPARE_MON_NICK_WITH_PREFIX_BUFFER(gBattleTextBuff1, gBattleStruct->expGetterBattlerId, gBattleStruct->expGetterMonId);
+                // buffer 'gained' or 'gained a boosted'
+                PREPARE_STRING_BUFFER(gBattleTextBuff2, i);
+                PREPARE_WORD_NUMBER_BUFFER(gBattleTextBuff3, 5, gBattleMoveDamage);
+
+                PrepareStringBattle(STRINGID_PKMNGAINEDEXP, gBattleStruct->expGetterBattlerId);
+
+                // Nuzlocke rule 7: effort stays with whoever actually fought.
+                // Only experience is redirected by the level cap, so a Pokémon
+                // handed someone else's exp does not collect their EVs too.
+                if (NuzlockeMonEarnedExpNormally(gBattleStruct->expGetterMonId, sentIn))
+                    MonGainEVs(&gPlayerParty[gBattleStruct->expGetterMonId], gBattleMons[gBattlerFainted].species);
+
                 gBattleStruct->sentInPokes >>= 1;
                 gBattleScripting.getexpState++;
             }
@@ -3434,7 +3416,10 @@ static void Cmd_getexp(void)
         if (gBattleControllerExecFlags == 0)
         {
             gBattleBufferB[gBattleStruct->expGetterBattlerId][0] = 0;
-            if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_HP) && GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) != MAX_LEVEL)
+            // Nuzlocke rule 7: the cap stands in for MAX_LEVEL here. It returns
+            // MAX_LEVEL once nothing is left to cap against, so this is a strict
+            // superset of the check it replaces.
+            if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_HP) && GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) < NuzlockeGetLevelCap())
             {
                 gBattleResources->beforeLvlUp->stats[STAT_HP]    = GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_MAX_HP);
                 gBattleResources->beforeLvlUp->stats[STAT_ATK]   = GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_ATK);

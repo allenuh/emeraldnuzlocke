@@ -18,6 +18,7 @@
 #include "window.h"
 #include "party_menu.h"
 #include "list_menu.h"
+#include "nuzlocke.h"
 #include "overworld.h"
 #include "constants/items.h"
 #include "constants/moves.h"
@@ -253,6 +254,10 @@ static u16 TakeSelectedPokemonFromDaycare(struct DaycareMon *daycareMon)
     if (GetMonData(&pokemon, MON_DATA_LEVEL) != MAX_LEVEL)
     {
         experience = GetMonData(&pokemon, MON_DATA_EXP) + daycareMon->steps;
+        // Nuzlocke rule 7: clamping the experience rather than the level is
+        // enough -- level is always derived from exp, so ApplyDaycareExperience
+        // stops on the cap by itself.
+        experience = NuzlockeClampExpToLevelCap(GetMonData(&pokemon, MON_DATA_SPECIES), experience);
         SetMonData(&pokemon, MON_DATA_EXP, &experience);
         ApplyDaycareExperience(&pokemon);
     }
@@ -288,6 +293,12 @@ static u8 GetLevelAfterDaycareSteps(struct BoxPokemon *mon, u32 steps)
     struct BoxPokemon tempMon = *mon;
 
     u32 experience = GetBoxMonData(mon, MON_DATA_EXP) + steps;
+
+    // Nuzlocke rule 7: this is the only source for both the "grew N levels"
+    // preview and the 100 + 100 x levels price quote, so clamping here is what
+    // keeps the Day Care from charging for levels it will not hand over.
+    experience = NuzlockeClampExpToLevelCap(GetBoxMonData(mon, MON_DATA_SPECIES), experience);
+
     SetBoxMonData(&tempMon, MON_DATA_EXP,  &experience);
     return GetLevelFromBoxMonExp(&tempMon);
 }
