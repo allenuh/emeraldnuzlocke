@@ -15,4 +15,10 @@ bool32 IsBoxMonNuzlockeDead(struct BoxPokemon *boxMon);
 void MarkMonAsNuzlockeDead(struct Pokemon *mon);
 void NuzlockeMarkFaintedPartyMons(void);
 
+// Nuzlocke rule 2: every Pokémon must be given a nickname when obtained.
+// Script specials used by the gift-Pokémon scripts; strict counterparts of
+// ChangePokemonNickname / ChangeBoxPokemonNickname.
+void NuzlockeNameReceivedPartyMon(void);
+void NuzlockeNameReceivedBoxMon(void);
+
 #endif // GUARD_NUZLOCKE_H

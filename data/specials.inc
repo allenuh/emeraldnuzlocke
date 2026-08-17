@@ -540,3 +540,7 @@ gSpecials::
 	def_special RemoveRecordsWindow
 	def_special CloseDeptStoreElevatorWindow
 	def_special TrySetBattleTowerLinkType
+
+@ Nuzlocke rule 2: mandatory nicknames for gift Pokémon.
+	def_special NuzlockeNameReceivedPartyMon, waitstate=1
+	def_special NuzlockeNameReceivedBoxMon, waitstate=1

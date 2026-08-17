@@ -817,6 +817,14 @@ Common_EventScript_NameReceivedPartyMon::
 	special ChangePokemonNickname
 	return
 
+@ Nuzlocke rule 2: same as above, but the player cannot confirm a blank name.
+@ Kept separate from Common_EventScript_NameReceivedPartyMon because the Name
+@ Rater uses that one, where confirming blank is how the player backs out.
+Common_EventScript_NuzlockeNameReceivedPartyMon::
+	fadescreen FADE_TO_BLACK
+	special NuzlockeNameReceivedPartyMon
+	return
+
 Common_EventScript_PlayerHandedOverTheItem::
 	bufferitemname STR_VAR_1, VAR_0x8004
 	playfanfare MUS_OBTAIN_TMHM

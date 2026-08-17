@@ -12,6 +12,14 @@ Common_EventScript_NameReceivedBoxMon::
 	faceplayer
 	return
 
+@ Nuzlocke rule 2: same as above, but the player cannot confirm a blank name.
+Common_EventScript_NuzlockeNameReceivedBoxMon::
+	fadescreen FADE_TO_BLACK
+	special NuzlockeNameReceivedBoxMon
+	lock
+	faceplayer
+	return
+
 Common_EventScript_TransferredToPC::
 	bufferboxname STR_VAR_1, VAR_PC_BOX_TO_SEND_MON
 	bufferspeciesname STR_VAR_2, VAR_TEMP_TRANSFERRED_SPECIES

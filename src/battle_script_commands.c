@@ -10225,48 +10225,14 @@ void BattleDestroyYesNoCursorAt(u8 cursorPosition)
 
 static void Cmd_trygivecaughtmonnick(void)
 {
+    // Nuzlocke: naming a caught Pokemon is mandatory, so the vanilla Yes/No
+    // prompt (and its "declined" exit) is gone -- this goes straight to the
+    // naming screen. The screen itself refuses an empty name.
     switch (gBattleCommunication[MULTIUSE_STATE])
     {
     case 0:
-        HandleBattleWindow(YESNOBOX_X_Y, 0);
-        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
-        gBattleCommunication[MULTIUSE_STATE]++;
-        gBattleCommunication[CURSOR_POSITION] = 0;
-        BattleCreateYesNoCursorAt(0);
-        break;
-    case 1:
-        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
-        {
-            PlaySE(SE_SELECT);
-            BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            BattleCreateYesNoCursorAt(0);
-        }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
-        {
-            PlaySE(SE_SELECT);
-            BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-            gBattleCommunication[CURSOR_POSITION] = 1;
-            BattleCreateYesNoCursorAt(1);
-        }
-        if (JOY_NEW(A_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            if (gBattleCommunication[CURSOR_POSITION] == 0)
-            {
-                gBattleCommunication[MULTIUSE_STATE]++;
-                BeginFastPaletteFade(3);
-            }
-            else
-            {
-                gBattleCommunication[MULTIUSE_STATE] = 4;
-            }
-        }
-        else if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[MULTIUSE_STATE] = 4;
-        }
+        gBattleCommunication[MULTIUSE_STATE] = 2;
+        BeginFastPaletteFade(3);
         break;
     case 2:
         if (!gPaletteFade.active)
@@ -10289,12 +10255,6 @@ static void Cmd_trygivecaughtmonnick(void)
             SetMonData(&gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]], MON_DATA_NICKNAME, gBattleStruct->caughtMonNick);
             gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
         }
-        break;
-    case 4:
-        if (CalculatePlayerPartyCount() == PARTY_SIZE)
-            gBattlescriptCurrInstr += 5;
-        else
-            gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
         break;
     }
 }

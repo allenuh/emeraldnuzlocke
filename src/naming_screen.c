@@ -376,6 +376,7 @@ static void DeleteTextCharacter(void);
 static bool8 AddTextCharacter(void);
 static void BufferCharacter(u8);
 static void SaveInputText(void);
+static bool8 IsTextBufferBlank(void);
 static void LoadGfx(void);
 static void CreateHelperTasks(void);
 static void LoadPalettes(void);
@@ -668,6 +669,23 @@ static bool8 MainState_MoveToOKButton(void)
 
 static bool8 MainState_PressedOKButton(void)
 {
+    // Nuzlocke: a Pokemon being obtained must actually be given a name. Without
+    // this the player could open the keyboard, press OK, and keep the species
+    // name -- i.e. opt out of the rule. Only the acquisition templates are
+    // strict; NAMING_SCREEN_NICKNAME (the Name Rater) stays lenient, since
+    // confirming blank is how the player backs out of it.
+    if ((sNamingScreen->templateNum == NAMING_SCREEN_CAUGHT_MON
+      || sNamingScreen->templateNum == NAMING_SCREEN_NICKNAME_REQUIRED)
+     && IsTextBufferBlank())
+    {
+        PlaySE(SE_FAILURE);
+        TryStartButtonFlash(BUTTON_COUNT, FALSE, TRUE); // stop OK flashing
+        SetInputState(INPUT_STATE_ENABLED);
+        SetCursorFlashing(TRUE);
+        sNamingScreen->state = STATE_HANDLE_INPUT;
+        return FALSE;
+    }
+
     SaveInputText();
     SetInputState(INPUT_STATE_DISABLED);
     SetCursorFlashing(FALSE);
@@ -1725,6 +1743,7 @@ static void (*const sDrawTextEntryBoxFuncs[])(void) =
     [NAMING_SCREEN_BOX]        = DrawNormalTextEntryBox,
     [NAMING_SCREEN_CAUGHT_MON] = DrawMonTextEntryBox,
     [NAMING_SCREEN_NICKNAME]   = DrawMonTextEntryBox,
+    [NAMING_SCREEN_NICKNAME_REQUIRED] = DrawMonTextEntryBox,
     [NAMING_SCREEN_WALDA]      = DrawNormalTextEntryBox,
 };
 
@@ -1848,18 +1867,24 @@ static void BufferCharacter(u8 ch)
     sNamingScreen->textBuffer[index] = ch;
 }
 
-static void SaveInputText(void)
+// TRUE if the player has typed nothing but spaces. In that case SaveInputText
+// leaves destBuffer alone, so the caller keeps whatever default it passed in.
+static bool8 IsTextBufferBlank(void)
 {
     u8 i;
 
     for (i = 0; i < sNamingScreen->template->maxChars; i++)
     {
         if (sNamingScreen->textBuffer[i] != CHAR_SPACE && sNamingScreen->textBuffer[i] != EOS)
-        {
-            StringCopyN(sNamingScreen->destBuffer, sNamingScreen->textBuffer, sNamingScreen->template->maxChars + 1);
-            break;
-        }
+            return FALSE;
     }
+    return TRUE;
+}
+
+static void SaveInputText(void)
+{
+    if (!IsTextBufferBlank())
+        StringCopyN(sNamingScreen->destBuffer, sNamingScreen->textBuffer, sNamingScreen->template->maxChars + 1);
 }
 
 static void LoadGfx(void)
@@ -2134,6 +2159,7 @@ static const struct NamingScreenTemplate *const sNamingScreenTemplates[] =
     [NAMING_SCREEN_BOX]        = &sPCBoxNamingTemplate,
     [NAMING_SCREEN_CAUGHT_MON] = &sMonNamingScreenTemplate,
     [NAMING_SCREEN_NICKNAME]   = &sMonNamingScreenTemplate,
+    [NAMING_SCREEN_NICKNAME_REQUIRED] = &sMonNamingScreenTemplate,
     [NAMING_SCREEN_WALDA]      = &sWaldaWordsScreenTemplate,
 };
 

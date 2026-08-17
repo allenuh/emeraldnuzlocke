@@ -8,6 +8,11 @@ enum {
     NAMING_SCREEN_BOX,
     NAMING_SCREEN_CAUGHT_MON,
     NAMING_SCREEN_NICKNAME,
+    // Nuzlocke: same screen as NAMING_SCREEN_NICKNAME, but the player cannot
+    // confirm an empty name. Used wherever a Pokemon is obtained (eggs, gifts,
+    // the starter). NAMING_SCREEN_NICKNAME itself stays lenient so the Name
+    // Rater can still be backed out of.
+    NAMING_SCREEN_NICKNAME_REQUIRED,
     NAMING_SCREEN_WALDA,
 };
 
