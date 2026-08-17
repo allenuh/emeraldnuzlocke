@@ -939,15 +939,27 @@ void ItemUseOutOfBattle_EvolutionStone(u8 taskId)
 
 void ItemUseInBattle_PokeBall(u8 taskId)
 {
-    // Nuzlocke rules 3 & 4: refuse before RemoveBagItem so a blocked throw
-    // never costs a ball.
-    if (!CanThrowBallAtCurrentEncounter())
-    {
-        const u8 *text = (NuzlockePrepareBallBlockMessage() == B_MSG_NUZLOCKE_DUPLICATE)
-                       ? gText_NuzlockeDuplicate
-                       : gText_NuzlockeAreaSpent;
+    const u8 *refusal = NULL;
 
-        StringExpandPlaceholders(gStringVar4, text);
+    // Vanilla removes the ball here and only discovers it was a trainer battle
+    // later, in Cmd_handleballthrow, which blocks the throw -- so the ball is
+    // spent for nothing. Refuse up front and keep it.
+    if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+    {
+        refusal = gText_TrainerBlockedTheBall;
+    }
+    // Nuzlocke rules 3 & 4: likewise refuse before RemoveBagItem so a blocked
+    // throw never costs a ball.
+    else if (!CanThrowBallAtCurrentEncounter())
+    {
+        refusal = (NuzlockePrepareBallBlockMessage() == B_MSG_NUZLOCKE_DUPLICATE)
+                ? gText_NuzlockeDuplicate
+                : gText_NuzlockeAreaSpent;
+    }
+
+    if (refusal != NULL)
+    {
+        StringExpandPlaceholders(gStringVar4, refusal);
         if (CurrentBattlePyramidLocation() == PYRAMID_LOCATION_NONE)
             DisplayItemMessage(taskId, FONT_NORMAL, gStringVar4, CloseItemMessage);
         else

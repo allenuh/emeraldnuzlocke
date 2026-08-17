@@ -1532,7 +1532,13 @@ static void OpenContextMenu(u8 taskId)
     {
     case ITEMMENULOCATION_BATTLE:
     case ITEMMENULOCATION_WALLY:
-        if (GetItemBattleUsage(gSpecialVar_ItemId))
+        // Nuzlocke rule 6: no bag items in battle except Balls. Offering only
+        // CANCEL is the game's own idiom for "not usable here", so this needs
+        // no new message. Held items are untouched -- they never come through
+        // the bag. Wally's tutorial shares this case but sets the item to
+        // ITEM_POKE_BALL beforehand, so it still passes.
+        if (GetItemBattleUsage(gSpecialVar_ItemId)
+         && GetItemPocket(gSpecialVar_ItemId) == POCKET_POKE_BALLS)
         {
             gBagMenu->contextMenuItemsPtr = sContextMenuItems_BattleUse;
             gBagMenu->contextMenuNumItems = ARRAY_COUNT(sContextMenuItems_BattleUse);

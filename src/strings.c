@@ -381,6 +381,7 @@ const u8 gText_PkmnAlreadyInBattle[] = _("{STR_VAR_1} is already\nin battle!{PAU
 const u8 gText_PkmnAlreadySelected[] = _("{STR_VAR_1} has already been\nselected.{PAUSE_UNTIL_PRESS}");
 const u8 gText_PkmnHasNoEnergy[] = _("{STR_VAR_1} has no energy\nleft to battle!{PAUSE_UNTIL_PRESS}");
 const u8 gText_PkmnIsGoneForever[] = _("{STR_VAR_1} is gone\nforever…{PAUSE_UNTIL_PRESS}");
+const u8 gText_TrainerBlockedTheBall[] = _("The TRAINER blocked the BALL!\nDon't be a thief!{PAUSE_UNTIL_PRESS}");
 const u8 gText_NuzlockeAreaSpent[] = _("You already had your chance at\n{STR_VAR_1}!{PAUSE_UNTIL_PRESS}");
 const u8 gText_NuzlockeDuplicate[] = _("You already own a {STR_VAR_1}!\nKeep looking for a new one!{PAUSE_UNTIL_PRESS}");
 const u8 gText_CantSwitchWithAlly[] = _("You can't switch {STR_VAR_1}'s\nPOKéMON with one of yours!{PAUSE_UNTIL_PRESS}");
