@@ -475,7 +475,10 @@ static const u8 sText_AarghAlmostHadIt[] = _("Aargh!\nAlmost had it!");
 static const u8 sText_ShootSoClose[] = _("Shoot!\nIt was so close, too!");
 static const u8 sText_GotchaPkmnCaughtPlayer[] = _("Gotcha!\n{B_OPPONENT_MON1_NAME} was caught!{WAIT_SE}{PLAY_BGM MUS_CAUGHT}\p");
 static const u8 sText_GotchaPkmnCaughtWally[] = _("Gotcha!\n{B_OPPONENT_MON1_NAME} was caught!{WAIT_SE}{PLAY_BGM MUS_CAUGHT}{PAUSE 127}");
-static const u8 sText_GiveNicknameCaptured[] = _("{B_OPPONENT_MON1_NAME} is yours now.\nGive it a name!");
+// PAUSE_UNTIL_PRESS holds this on screen until the player acknowledges it.
+// Without it the message flashes past, because rule 2 replaced the Yes/No box
+// that used to wait here with an immediate fade into the naming screen.
+static const u8 sText_GiveNicknameCaptured[] = _("{B_OPPONENT_MON1_NAME} is yours now.\nGive it a name!{PAUSE_UNTIL_PRESS}");
 static const u8 sText_PkmnSentToPC[] = _("{B_OPPONENT_MON1_NAME} was sent to\n{B_PC_CREATOR_NAME} PC.");
 static const u8 sText_Someones[] = _("someone's");
 static const u8 sText_Lanettes[] = _("LANETTE's");
