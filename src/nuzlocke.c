@@ -33,6 +33,24 @@ STATIC_ASSERT(sizeof(struct BoxPokemon) == 80, NuzlockeBoxPokemonSizeUnchanged);
 STATIC_ASSERT(offsetof(struct SaveBlock1, trainerHillTimes) == 0x3718, NuzlockeSaveBlock1LayoutUnchanged);
 STATIC_ASSERT(NUZLOCKE_AREA_BYTES * 8 >= MAPSEC_COUNT, NuzlockeAreaBitfieldCoversAllAreas);
 
+// The 5 Poké Balls the rival hands over in Birch's Lab are the point where the
+// player can first comply with the catching rules at all. Before that, Routes
+// 101 and 103 are the only reachable areas and the starter is the only Pokémon
+// owned, so rules 1 and 3/4 would only punish a player with no way to obey them.
+//
+// FLAG_ADVENTURE_STARTED is set on the line directly below those giveitem calls,
+// and vanilla already treats it as the "player may have Poké Balls" boundary --
+// the Oldale Mart stocks none until it is set -- so no new save data is needed.
+//
+// Deliberately not applied to the other rules: the starter is received *before*
+// this flag and must still be nicknamed (rule 2), and rules 5-7 cannot be
+// violated this early. Hence the name -- this asks about the milestone, not
+// about whether "the nuzlocke is on".
+static bool32 HasPlayerReceivedPokeBalls(void)
+{
+    return FlagGet(FLAG_ADVENTURE_STARTED);
+}
+
 bool32 IsBoxMonNuzlockeDead(struct BoxPokemon *boxMon)
 {
     return GetBoxMonData(boxMon, MON_DATA_NUZLOCKE_DEAD, NULL) != 0;
@@ -45,10 +63,18 @@ bool32 IsMonNuzlockeDead(struct Pokemon *mon)
 
 // Marks a Pokémon as permanently dead. Empty party slots and Eggs are skipped:
 // an Egg can be at 0 HP without having fainted, and an empty slot is not a mon.
+//
+// This is the only function anywhere that sets the dead bit, so gating it here
+// is what makes the whole of rule 1 dormant before the Poké Balls -- every faint
+// path (Cmd_tryfaintmon, the post-battle net, field poison) runs through it.
+// Leaving the bit unset also restores the vanilla whiteout heal for free: the
+// HP pin in SetMonData only fires on that bit, so HealPlayerParty works again.
 void MarkMonAsNuzlockeDead(struct Pokemon *mon)
 {
     u8 dead = TRUE;
 
+    if (!HasPlayerReceivedPokeBalls())
+        return;
     if (!GetMonData(mon, MON_DATA_SANITY_HAS_SPECIES, NULL))
         return;
     if (GetMonData(mon, MON_DATA_SANITY_IS_EGG, NULL))
@@ -167,8 +193,20 @@ bool32 IsSpeciesFamilyOwned(u16 species)
 // different entry points and so are never classified -- they stay EXEMPT.
 void NuzlockeEvaluateWildEncounter(void)
 {
-    u16 species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL);
+    u16 species;
 
+    // Grace period: before the Poké Balls, don't classify the encounter at all.
+    // Staying EXEMPT means NuzlockeFinishWildEncounter spends nothing, so Routes
+    // 101 and 103 keep their one catch for when the player returns able to use
+    // it. Set explicitly rather than assumed, so no stale state can leak in.
+    if (!HasPlayerReceivedPokeBalls())
+    {
+        sEncounterStatus = NUZLOCKE_ENCOUNTER_EXEMPT;
+        sEncounterMapSec = MAPSEC_NONE;
+        return;
+    }
+
+    species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL);
     sEncounterMapSec = gMapHeader.regionMapSectionId;
 
     if (IsAreaEncounterSpent(sEncounterMapSec))
