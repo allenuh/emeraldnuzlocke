@@ -394,6 +394,11 @@ static const u8 sLeafStoneDesc[] = _(
     "species of POKéMON\n"
     "evolve.");
 
+static const u8 sLinkStoneDesc[] = _(
+    "Evolves POKéMON\n"
+    "that would evolve\n"
+    "by being traded.");
+
 // Valuable items
 static const u8 sTinyMushroomDesc[] = _(
     "A plain mushroom\n"

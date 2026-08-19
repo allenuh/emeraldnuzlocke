@@ -5637,14 +5637,50 @@ u16 GetEvolutionTargetSpecies(struct Pokemon *mon, u8 mode, u16 evolutionItem)
         break;
     case EVO_MODE_ITEM_USE:
     case EVO_MODE_ITEM_CHECK:
+        // Note that this switches on the method rather than testing the fields
+        // directly. Empty evolution slots are all-zero, and a mon holding
+        // nothing has heldItem == ITEM_NONE == 0, so a flat "param == heldItem"
+        // test would match every empty slot. Methods start at 1, so method 0
+        // reaches no case at all.
         for (i = 0; i < EVOS_PER_MON; i++)
         {
-            if (gEvolutionTable[species][i].method == EVO_ITEM
-             && gEvolutionTable[species][i].param == evolutionItem)
+            switch (gEvolutionTable[species][i].method)
             {
-                targetSpecies = gEvolutionTable[species][i].targetSpecies;
+            case EVO_ITEM:
+                if (gEvolutionTable[species][i].param == evolutionItem)
+                    targetSpecies = gEvolutionTable[species][i].targetSpecies;
+                break;
+            // A LINK STONE stands in for a trade, so it reads the trade rows of
+            // the evolution table directly instead of duplicating all of them as
+            // EVO_ITEM rows. That keeps one statement of "which species evolve by
+            // trade" rather than two that could drift apart. Species that have to
+            // be holding an item to evolve by trade still have to hold it, and it
+            // is still consumed -- the stone replaces the trade, not the item.
+            case EVO_TRADE:
+                if (evolutionItem == ITEM_LINK_STONE)
+                    targetSpecies = gEvolutionTable[species][i].targetSpecies;
+                break;
+            case EVO_TRADE_ITEM:
+                if (evolutionItem == ITEM_LINK_STONE
+                 && gEvolutionTable[species][i].param == heldItem)
+                {
+                    // Only consume on a real use. EVO_MODE_ITEM_CHECK is the
+                    // party menu asking whether to grey the slot out, and must
+                    // leave the mon alone. Uses its own local rather than
+                    // clobbering heldItem the way the trade path above does,
+                    // which would break Clamperl's second EVO_TRADE_ITEM row.
+                    if (mode == EVO_MODE_ITEM_USE)
+                    {
+                        u16 consumedItem = ITEM_NONE;
+                        SetMonData(mon, MON_DATA_HELD_ITEM, &consumedItem);
+                    }
+                    targetSpecies = gEvolutionTable[species][i].targetSpecies;
+                }
                 break;
             }
+
+            if (targetSpecies != SPECIES_NONE)
+                break;
         }
         break;
     }

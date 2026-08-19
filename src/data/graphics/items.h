@@ -200,6 +200,9 @@ const u32 gItemIconPalette_WaterStone[] = INCGFX_U32("graphics/items/icon_palett
 const u32 gItemIcon_LeafStone[] = INCGFX_U32("graphics/items/icons/leaf_stone.png", ".4bpp.lz");
 const u32 gItemIconPalette_LeafStone[] = INCGFX_U32("graphics/items/icon_palettes/leaf_stone.pal", ".gbapal.lz");
 
+const u32 gItemIcon_LinkStone[] = INCGFX_U32("graphics/items/icons/link_stone.png", ".4bpp.lz");
+const u32 gItemIconPalette_LinkStone[] = INCGFX_U32("graphics/items/icon_palettes/link_stone.pal", ".gbapal.lz");
+
 // Valuables
 
 const u32 gItemIcon_TinyMushroom[] = INCGFX_U32("graphics/items/icons/tiny_mushroom.png", ".4bpp.lz");
