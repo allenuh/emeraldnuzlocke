@@ -684,11 +684,12 @@ const u8 gText_GreenShard[] = _("GREEN SHARD");
 const u8 gText_BattleFrontier[] = _("BATTLE FRONTIER");
 const u8 gText_Right[] = _("Right");
 const u8 gText_Left[] = _("Left");
-const u8 gText_TM32AndPrice[] = _("TM32{CLEAR_TO 72}1,500 COINS");
-const u8 gText_TM29AndPrice[] = _("TM29{CLEAR_TO 72}3,500 COINS");
-const u8 gText_TM35AndPrice[] = _("TM35{CLEAR_TO 72}4,000 COINS");
-const u8 gText_TM24AndPrice[] = _("TM24{CLEAR_TO 72}4,000 COINS");
-const u8 gText_TM13AndPrice[] = _("TM13{CLEAR_TO 72}4,000 COINS");
+// These must match the coin prices in data/maps/MauvilleCity_GameCorner/scripts.inc.
+const u8 gText_TM32AndPrice[] = _("TM32{CLEAR_TO 72}1,000 COINS");
+const u8 gText_TM29AndPrice[] = _("TM29{CLEAR_TO 72}1,500 COINS");
+const u8 gText_TM35AndPrice[] = _("TM35{CLEAR_TO 72}1,500 COINS");
+const u8 gText_TM24AndPrice[] = _("TM24{CLEAR_TO 72}1,500 COINS");
+const u8 gText_TM13AndPrice[] = _("TM13{CLEAR_TO 72}1,500 COINS");
 const u8 gText_Cool[] = _("COOL");
 const u8 gText_Beauty[] = _("BEAUTY");
 const u8 gText_Cute[] = _("CUTE");
