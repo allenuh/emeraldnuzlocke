@@ -17,6 +17,7 @@
 #include "list_menu.h"
 #include "mystery_event_menu.h"
 #include "naming_screen.h"
+#include "nuzlocke.h"
 #include "option_menu.h"
 #include "overworld.h"
 #include "palette.h"
@@ -638,7 +639,17 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
 
         if (IsWirelessAdapterConnected())
             tWirelessAdapterConnected = TRUE;
-        switch (gSaveFileStatus)
+        // Nuzlocke rule 8: a run that ended in a whiteout is still on the cart
+        // and still loads, but can never be resumed. Handled ahead of the status
+        // switch so it covers a damaged save too, and borrows the treatment
+        // vanilla already gives an erased one -- message, then NEW GAME only.
+        if (NuzlockeIsRunOver() && (gSaveFileStatus == SAVE_STATUS_OK || gSaveFileStatus == SAVE_STATUS_ERROR))
+        {
+            CreateMainMenuErrorWindow(gText_NuzlockeRunOver);
+            tMenuType = HAS_NO_SAVED_GAME;
+            gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
+        }
+        else switch (gSaveFileStatus)
         {
             case SAVE_STATUS_OK:
                 tMenuType = HAS_SAVED_GAME;

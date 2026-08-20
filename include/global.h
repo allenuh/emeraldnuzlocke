@@ -1070,10 +1070,15 @@ struct SaveBlock1
     /*0x322C*/ struct MysteryGiftSave mysteryGift;
     // Nuzlocke rule 3: one bit per region map section, set once that area's
     // single catch opportunity has been used up. Carved out of what was
-    // unused_3598[0x180]; the two fields still total 0x180 so every offset
+    // unused_3598[0x180]; the fields still total 0x180 so every offset
     // below is unchanged and existing save files stay valid.
     /*0x3598*/ u8 nuzlockeAreaEncounterSpent[NUZLOCKE_AREA_BYTES];
-    /*0x35B3*/ u8 unused_35B3[0x180 - NUZLOCKE_AREA_BYTES];
+    // Nuzlocke rule 8: which optional rules this save was started under, as
+    // NUZLOCKE_RULE_* bits, and whether a whiteout has already ended the run.
+    // Both live in SaveBlock1 so ClearSav1 resets them on NEW GAME for free.
+    /*0x35B3*/ u8 nuzlockeRuleFlags;
+    /*0x35B4*/ u8 nuzlockeRunOver;
+    /*0x35B5*/ u8 unused_35B5[0x180 - NUZLOCKE_AREA_BYTES - 2];
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

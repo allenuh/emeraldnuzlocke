@@ -385,6 +385,7 @@ const u8 gText_TrainerBlockedTheBall[] = _("The TRAINER blocked the BALL!\nDon't
 const u8 gText_NuzlockeAreaSpent[] = _("You already had your chance at\n{STR_VAR_1}!{PAUSE_UNTIL_PRESS}");
 const u8 gText_NuzlockeDuplicate[] = _("You already own a {STR_VAR_1}!\nKeep looking for a new one!{PAUSE_UNTIL_PRESS}");
 const u8 gText_NuzlockeOverLevelCap[] = _("{STR_VAR_1} is above the\nLv. {STR_VAR_2} cap!{PAUSE_UNTIL_PRESS}");
+const u8 gText_NuzlockeRunOver[] = _("Your journey has ended here.\nThis save can't be continued.");
 const u8 gText_CantSwitchWithAlly[] = _("You can't switch {STR_VAR_1}'s\nPOKéMON with one of yours!{PAUSE_UNTIL_PRESS}");
 const u8 gText_EggCantBattle[] = _("An EGG can't battle!{PAUSE_UNTIL_PRESS}");
 const u8 gText_CantUseUntilNewBadge[] = _("This can't be used until a new\nBADGE is obtained.{PAUSE_UNTIL_PRESS}");

@@ -1,5 +1,6 @@
 #include "global.h"
 #include "new_game.h"
+#include "nuzlocke.h"
 #include "random.h"
 #include "pokemon.h"
 #include "roamer.h"
@@ -158,6 +159,9 @@ void NewGameInitData(void)
     ResetPokedex();
     ClearFrontierRecord();
     ClearSav1();
+    // Nuzlocke rule 8: must follow ClearSav1, which has just wiped the rule
+    // flags along with the rest of SaveBlock1.
+    NuzlockeInitRulesForNewGame();
     ClearAllMail();
     gSaveBlock2Ptr->specialSaveWarpFlags = 0;
     gSaveBlock2Ptr->gcnLinkFlags = 0;

@@ -2,6 +2,7 @@
 #include "nuzlocke.h"
 #include "event_data.h"
 #include "item.h"
+#include "main.h"
 #include "naming_screen.h"
 #include "overworld.h"
 #include "battle.h"
@@ -10,6 +11,7 @@
 #include "pokemon.h"
 #include "pokemon_storage_system.h"
 #include "region_map.h"
+#include "save.h"
 #include "string_util.h"
 #include "constants/battle_string_ids.h"
 #include "constants/flags.h"
@@ -32,6 +34,9 @@ STATIC_ASSERT(sizeof(struct BoxPokemon) == 80, NuzlockeBoxPokemonSizeUnchanged);
 // existing save files break -- fail the build instead of corrupting saves.
 STATIC_ASSERT(offsetof(struct SaveBlock1, trainerHillTimes) == 0x3718, NuzlockeSaveBlock1LayoutUnchanged);
 STATIC_ASSERT(NUZLOCKE_AREA_BYTES * 8 >= MAPSEC_COUNT, NuzlockeAreaBitfieldCoversAllAreas);
+// Every further nuzlocke field is taken from the same filler, so it is the
+// filler running out -- not the offsets moving -- that would bite first.
+STATIC_ASSERT(NUZLOCKE_AREA_BYTES + 2 <= 0x180, NuzlockeSaveFieldsFitInFiller);
 
 // The 5 Poké Balls the rival hands over in Birch's Lab are the point where the
 // player can first comply with the catching rules at all. Before that, Routes
@@ -553,4 +558,79 @@ void NuzlockeNameReceivedBoxMon(void)
                    GetBoxMonGender(boxMon),
                    GetBoxMonData(boxMon, MON_DATA_PERSONALITY, NULL),
                    CB2_SetReceivedBoxMonNickname);
+}
+
+//
+// Rule 8: whiting out ends the run.
+//
+
+// The rules a new save will be started under. This is staged in EWRAM rather
+// than written straight to the save because the options menu that will set it
+// runs during the Birch speech, and NewGameInitData's ClearSav1 wipes all of
+// SaveBlock1 afterwards -- anything written early would be erased moments later.
+// NuzlockeInitRulesForNewGame copies it across once the wipe is done.
+static EWRAM_DATA u8 sPendingRuleFlags = NUZLOCKE_RULES_DEFAULT;
+
+void NuzlockeStageRuleFlags(u8 flags)
+{
+    sPendingRuleFlags = flags;
+}
+
+u8 NuzlockeGetStagedRuleFlags(void)
+{
+    return sPendingRuleFlags;
+}
+
+void NuzlockeInitRulesForNewGame(void)
+{
+    gSaveBlock1Ptr->nuzlockeRuleFlags = sPendingRuleFlags;
+}
+
+// Save files made before the optional rules existed read back 0 here, which is
+// exactly right: they keep the permissive behaviour they were played under.
+bool32 NuzlockeRuleEnabled(u32 rule)
+{
+    return (gSaveBlock1Ptr->nuzlockeRuleFlags & rule) != 0;
+}
+
+bool32 NuzlockeIsRunOver(void)
+{
+    return gSaveBlock1Ptr->nuzlockeRunOver != 0;
+}
+
+// The screen is already black by the time this runs -- CB2_WhiteOut holds it for
+// 120 frames before handing over -- so this is just a beat of silence between the
+// "whited out!" message and the reset, rather than a fade. The explanation is
+// waiting on the main menu.
+static void CB2_NuzlockeRunOver(void)
+{
+    if (++gMain.state >= 40)
+        DoSoftReset();
+}
+
+// Called from CB2_WhiteOut, the one place every whiteout in the game passes
+// through -- battle losses, field poison, and the Mossdeep multi battle alike.
+// Battle Frontier, Pyramid, Pike, Trainer Hill and Secret Base losses never
+// reach it, so they need no exemption here.
+//
+// The early-game grace period is the same one rules 1 and 3/4 use: before the
+// Poké Balls the player has one Pokémon and no way to build a safety net, so a
+// loss on Route 101 heals as it always did. Ending the run there would punish a
+// player for a rule they had no means to obey.
+//
+// The save is committed here, before anything is drawn, so a whiteout the player
+// has already seen cannot be undone by resetting the console.
+bool32 NuzlockeTryEndRunOnWhiteOut(void)
+{
+    if (!NuzlockeRuleEnabled(NUZLOCKE_RULE_RESTART_ON_WHITEOUT))
+        return FALSE;
+    if (!HasPlayerReceivedPokeBalls())
+        return FALSE;
+
+    gSaveBlock1Ptr->nuzlockeRunOver = TRUE;
+    TrySavingData(SAVE_NORMAL);
+
+    gMain.state = 0;
+    SetMainCallback2(CB2_NuzlockeRunOver);
+    return TRUE;
 }

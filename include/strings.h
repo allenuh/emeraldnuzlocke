@@ -511,6 +511,7 @@ extern const u8 gText_TrainerBlockedTheBall[];
 extern const u8 gText_NuzlockeAreaSpent[];
 extern const u8 gText_NuzlockeDuplicate[];
 extern const u8 gText_NuzlockeOverLevelCap[];
+extern const u8 gText_NuzlockeRunOver[];
 extern const u8 gText_EggCantBattle[];
 extern const u8 gText_PkmnAlreadySelected[];
 extern const u8 gText_PkmnAlreadyInBattle[];

@@ -74,4 +74,33 @@ void NuzlockeComputeExpAwards(u32 participantExp, u32 shareExp, u32 sentInPokes)
 u16 NuzlockeGetExpAward(u8 partySlot);
 bool32 NuzlockeMonEarnedExpNormally(u8 partySlot, u32 sentInPokes);
 
+// Nuzlocke rule 8: whiting out ends the run for good -- the save can no longer
+// be continued and the player has to start over.
+//
+// This is the first *optional* rule. Rules 1-7 are core and always on; whether a
+// whiteout is fatal is a matter of taste, and the permissive reading (box the
+// Pokémon that fell and carry on with what is left in the PC) already works.
+// So the rule is stored per save rather than compiled in, ready for the planned
+// options menu at new-game time to choose between the two.
+#define NUZLOCKE_RULE_RESTART_ON_WHITEOUT (1 << 0)
+// Future optional rules claim (1 << 1), (1 << 2), ... here.
+#define NUZLOCKE_RULES_DEFAULT (NUZLOCKE_RULE_RESTART_ON_WHITEOUT)
+
+bool32 NuzlockeRuleEnabled(u32 rule);
+
+// TRUE once a whiteout has ended this save. Read by the main menu, which then
+// offers NEW GAME only.
+bool32 NuzlockeIsRunOver(void);
+
+// Called at the whiteout choke point. Returns FALSE to let the vanilla whiteout
+// proceed; TRUE means the run is over and the caller must not continue.
+bool32 NuzlockeTryEndRunOnWhiteOut(void);
+
+// The options menu will run during the Birch speech, but NewGameInitData's
+// ClearSav1 wipes all of SaveBlock1 afterwards -- so choices are staged in EWRAM
+// and copied into the save once the wipe is done.
+void NuzlockeStageRuleFlags(u8 flags);
+u8 NuzlockeGetStagedRuleFlags(void);
+void NuzlockeInitRulesForNewGame(void);
+
 #endif // GUARD_NUZLOCKE_H

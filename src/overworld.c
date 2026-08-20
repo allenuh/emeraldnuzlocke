@@ -37,6 +37,7 @@
 #include "mirage_tower.h"
 #include "money.h"
 #include "new_game.h"
+#include "nuzlocke.h"
 #include "palette.h"
 #include "play_time.h"
 #include "random.h"
@@ -1556,6 +1557,11 @@ void CB2_WhiteOut(void)
         FieldClearVBlankHBlankCallbacks();
         StopMapMusic();
         ResetSafariZoneFlag_();
+        // Nuzlocke rule 8: an optional rule ends the run here. Checked before
+        // DoWhiteOut so the money penalty, the heal and the warp back to the
+        // Pokémon Center never happen -- there is nothing to come back to.
+        if (NuzlockeTryEndRunOnWhiteOut())
+            return;
         DoWhiteOut();
         ResetInitialPlayerAvatarState();
         ScriptContext_Init();
