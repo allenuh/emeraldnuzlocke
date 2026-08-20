@@ -27,11 +27,17 @@ void NuzlockeNameReceivedBoxMon(void);
 // How the current wild encounter relates to the rule. Anything not generated
 // from a route's encounter table (legendaries, Sudowoodo, Kecleon, gift
 // battles) stays EXEMPT and is always catchable.
+//
+// EXEMPT, COUNTS and SHINY allow a ball; AREA_SPENT and DUPLICATE refuse one.
+// That split is what CanThrowBallAtCurrentEncounter encodes, and it is the
+// thing to get right when adding a status -- only the refusing ones reach
+// NuzlockePrepareBallBlockMessage.
 enum {
     NUZLOCKE_ENCOUNTER_EXEMPT,
     NUZLOCKE_ENCOUNTER_AREA_SPENT, // this area's one chance is already used
     NUZLOCKE_ENCOUNTER_DUPLICATE,  // family already owned; keep looking
     NUZLOCKE_ENCOUNTER_COUNTS,     // the real encounter for this area
+    NUZLOCKE_ENCOUNTER_SHINY,      // rule 9 rescued it; catchable, spends nothing
 };
 
 bool32 IsSpeciesFamilyOwned(u16 species);
@@ -83,8 +89,29 @@ bool32 NuzlockeMonEarnedExpNormally(u8 partySlot, u32 sentInPokes);
 // So the rule is stored per save rather than compiled in, ready for the planned
 // options menu at new-game time to choose between the two.
 #define NUZLOCKE_RULE_RESTART_ON_WHITEOUT (1 << 0)
-// Future optional rules claim (1 << 1), (1 << 2), ... here.
-#define NUZLOCKE_RULES_DEFAULT (NUZLOCKE_RULE_RESTART_ON_WHITEOUT)
+
+// Nuzlocke rule 9 (shiny clause): a shiny wild Pokémon may be caught whatever
+// would otherwise have refused it -- the area's one catch already spent, or a
+// family already owned -- and catching it spends nothing, so the area keeps its
+// chance. A shiny that IS the area's first encounter is still that encounter
+// and spends it like any other.
+//
+// Optional rather than core for the same reason rule 8 is: players disagree on
+// whether a run that turns down a shiny is playing the spirit of the rules.
+#define NUZLOCKE_RULE_SHINY_CLAUSE (1 << 1)
+
+// A shiny the clause rescued is a trophy: caught and kept, but permanently
+// fainted, and never registered in the Pokédex. It never paid an area's
+// encounter for its place, so it earns none of the things one buys -- no
+// battling, no experience, no evolution family claimed, no dex progress.
+//
+// A shiny that WAS the area's encounter did pay, and is an ordinary Pokémon.
+// The test is therefore trophy-ness, not shininess.
+bool32 NuzlockeIsTrophyCatch(void);
+void NuzlockeFaintTrophyCatch(struct Pokemon *mon);
+
+// Future optional rules claim (1 << 2), (1 << 3), ... here.
+#define NUZLOCKE_RULES_DEFAULT (NUZLOCKE_RULE_RESTART_ON_WHITEOUT | NUZLOCKE_RULE_SHINY_CLAUSE)
 
 bool32 NuzlockeRuleEnabled(u32 rule);
 

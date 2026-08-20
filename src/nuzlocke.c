@@ -104,6 +104,8 @@ void NuzlockeMarkFaintedPartyMons(void)
 
 //
 // Rules 3 & 4: one catch per area, with the duplicate clause.
+// Rule 9 (shiny clause) rides on the same classification -- see the tail of
+// NuzlockeEvaluateWildEncounter.
 //
 
 // Where the current wild encounter stands. Transient -- it only has to survive
@@ -220,6 +222,20 @@ void NuzlockeEvaluateWildEncounter(void)
         sEncounterStatus = NUZLOCKE_ENCOUNTER_DUPLICATE;
     else
         sEncounterStatus = NUZLOCKE_ENCOUNTER_COUNTS;
+
+    // Rule 9: a shiny is catchable whatever blocked it -- the area's chance
+    // already spent, or a family already owned. Deliberately a pass over the
+    // verdict above rather than another branch within it, because the clause
+    // only rescues an encounter that was already going to be refused: a shiny
+    // that IS the area's first encounter stays COUNTS and spends the chance
+    // like any other. Written this way, that case needs no code of its own.
+    //
+    // The branch above always lands on one of the three classified statuses, so
+    // testing COUNTS alone is enough to mean "was going to be refused".
+    if (sEncounterStatus != NUZLOCKE_ENCOUNTER_COUNTS
+     && NuzlockeRuleEnabled(NUZLOCKE_RULE_SHINY_CLAUSE)
+     && IsMonShiny(&gEnemyParty[0]))
+        sEncounterStatus = NUZLOCKE_ENCOUNTER_SHINY;
 }
 
 u8 GetNuzlockeEncounterStatus(void)
@@ -230,11 +246,17 @@ u8 GetNuzlockeEncounterStatus(void)
 bool32 CanThrowBallAtCurrentEncounter(void)
 {
     return sEncounterStatus == NUZLOCKE_ENCOUNTER_EXEMPT
-        || sEncounterStatus == NUZLOCKE_ENCOUNTER_COUNTS;
+        || sEncounterStatus == NUZLOCKE_ENCOUNTER_COUNTS
+        || sEncounterStatus == NUZLOCKE_ENCOUNTER_SHINY;
 }
 
 // Buffers the reason into gStringVar1 and returns which message to print, so
 // the three places that can refuse a throw all word it the same way.
+//
+// Only ever reached for a status this rejects: all three callers sit behind
+// !CanThrowBallAtCurrentEncounter(). That is what lets the tail below assume
+// AREA_SPENT -- a new *allowed* status is free, but a new *refused* one has to
+// be spelled out here, and in the two-way ternary in ItemUseInBattle_PokeBall.
 u8 NuzlockePrepareBallBlockMessage(void)
 {
     if (sEncounterStatus == NUZLOCKE_ENCOUNTER_DUPLICATE)
@@ -247,9 +269,54 @@ u8 NuzlockePrepareBallBlockMessage(void)
     return B_MSG_NUZLOCKE_AREA_SPENT;
 }
 
+// Rule 9: whether the Pokémon about to be handed over only got its ball because
+// the shiny clause rescued the encounter. Read from the cached status rather
+// than re-derived at catch time on purpose: Cmd_trysetcaughtmondexflags runs
+// first and has already set the dex caught flag by then, so asking "was this a
+// duplicate?" that late would always answer no.
+bool32 NuzlockeIsTrophyCatch(void)
+{
+    return sEncounterStatus == NUZLOCKE_ENCOUNTER_SHINY;
+}
+
+// Faints a trophy for good, on its way to the player.
+//
+// MarkMonAsNuzlockeDead only sets the flag. Rule 1 has only ever called it on
+// Pokémon that were already at 0 HP, and the HP pin in SetMonData is reactive --
+// it fires on an HP write, it does not sweep -- so a trophy caught in good
+// health would otherwise arrive at full HP wearing a dead bit, selectable and
+// battle-ready. The faint has to be spelled out.
+//
+// Called before GiveMonToPlayer so one hook covers both destinations: the party
+// path memcpys the whole struct Pokemon and the box path memcpys mon->box, so
+// the dead bit rides along either way. In the box case the HP write is simply
+// discarded -- BoxPokemon has no HP -- and CalculateMonStats re-zeroes it on
+// withdrawal from the same bit, which is the quirk rule 1 already closed.
+//
+// MarkMonAsNuzlockeDead's Poké Ball gate is never reached from here: before the
+// balls the evaluator returns EXEMPT, so SHINY cannot occur.
+void NuzlockeFaintTrophyCatch(struct Pokemon *mon)
+{
+    u16 zeroHp = 0;
+    u32 zeroStatus = STATUS1_NONE;
+
+    if (!NuzlockeIsTrophyCatch())
+        return;
+
+    MarkMonAsNuzlockeDead(mon);
+    SetMonData(mon, MON_DATA_HP, &zeroHp);
+    // A Pokémon softened with Sleep or Paralysis before the ball would otherwise
+    // sit in the party fainted and still showing SLP.
+    SetMonData(mon, MON_DATA_STATUS, &zeroStatus);
+}
+
 // Every outcome spends the chance -- caught, fainted, fled, or ran -- so the
 // battle result is deliberately not consulted. Resetting to EXEMPT also stops a
 // later scripted battle from inheriting this battle's state.
+//
+// Only COUNTS spends, which is also how rule 9 gets its "a shiny does not count
+// as the encounter for that area" for free: a rescued shiny is SHINY, not
+// COUNTS, so the area keeps its chance no matter how the battle ends.
 void NuzlockeFinishWildEncounter(void)
 {
     if (sEncounterStatus == NUZLOCKE_ENCOUNTER_COUNTS)

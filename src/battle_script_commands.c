@@ -10055,6 +10055,11 @@ static void Cmd_handleballthrow(void)
 
 static void Cmd_givecaughtmon(void)
 {
+    // Nuzlocke rule 9: a shiny the clause rescued is a trophy, not a team
+    // member. Faint it before it changes hands, so the dead bit rides the copy
+    // into the party or the box, whichever it lands in.
+    NuzlockeFaintTrophyCatch(&gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]]);
+
     if (GiveMonToPlayer(&gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]]) != MON_GIVEN_TO_PARTY)
     {
         if (!ShouldShowBoxWasFullMessage())
@@ -10088,7 +10093,16 @@ static void Cmd_trysetcaughtmondexflags(void)
     u16 species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL);
     u32 personality = GetMonData(&gEnemyParty[0], MON_DATA_PERSONALITY, NULL);
 
-    if (GetSetPokedexFlag(SpeciesToNationalPokedexNum(species), FLAG_GET_CAUGHT))
+    // Nuzlocke rule 9: a trophy shiny is never registered as caught. That is
+    // what stops it claiming its evolution family -- the duplicate clause reads
+    // this very flag, so a trophy Ralts must not lock the player out of ever
+    // catching a usable one. Taking the already-registered branch also stops the
+    // game announcing a dex entry it is not writing.
+    //
+    // A species the player already owns is unaffected: it would take this branch
+    // anyway, and the existing flag is never cleared.
+    if (NuzlockeIsTrophyCatch()
+     || GetSetPokedexFlag(SpeciesToNationalPokedexNum(species), FLAG_GET_CAUGHT))
     {
         gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
     }
