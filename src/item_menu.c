@@ -20,6 +20,7 @@
 #include "item.h"
 #include "item_menu_icons.h"
 #include "item_use.h"
+#include "key_system.h"
 #include "lilycove_lady.h"
 #include "list_menu.h"
 #include "link.h"
@@ -28,6 +29,8 @@
 #include "map_name_popup.h"
 #include "menu.h"
 #include "money.h"
+#include "nuzlocke.h"
+#include "surplus_berries.h"
 #include "overworld.h"
 #include "palette.h"
 #include "party_menu.h"
@@ -1537,8 +1540,12 @@ static void OpenContextMenu(u8 taskId)
         // no new message. Held items are untouched -- they never come through
         // the bag. Wally's tutorial shares this case but sets the item to
         // ITEM_POKE_BALL beforehand, so it still passes.
+        //
+        // With the rule switched off in the rules menu, anything usable in
+        // battle is offered, which is the vanilla condition.
         if (GetItemBattleUsage(gSpecialVar_ItemId)
-         && GetItemPocket(gSpecialVar_ItemId) == POCKET_POKE_BALLS)
+         && (NuzlockeBagItemsAllowedInBattle()
+          || GetItemPocket(gSpecialVar_ItemId) == POCKET_POKE_BALLS))
         {
             gBagMenu->contextMenuItemsPtr = sContextMenuItems_BattleUse;
             gBagMenu->contextMenuNumItems = ARRAY_COUNT(sContextMenuItems_BattleUse);
@@ -2073,7 +2080,17 @@ static void Task_ItemContext_Sell(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
 
-    if (GetItemPrice(gSpecialVar_ItemId) == 0)
+    // Key system: the bottomless Rare Candy stack cannot be sold. It costs
+    // nothing to replace, so selling it would be an unlimited money press.
+    // Folded into the existing refusal rather than given a message of its own --
+    // "I can't buy that" is already exactly what the clerk should say.
+    //
+    // The Surplus Berries box gives its six berries away for the same reason, so
+    // a Mart must not buy them back. This also costs home-grown EV berries their
+    // resale value, which is 10 each and not the point of them.
+    if (GetItemPrice(gSpecialVar_ItemId) == 0
+     || (gSpecialVar_ItemId == ITEM_RARE_CANDY && KeySystemInfiniteRareCandy())
+     || IsSurplusBerry(gSpecialVar_ItemId))
     {
         CopyItemName(gSpecialVar_ItemId, gStringVar2);
         StringExpandPlaceholders(gStringVar4, gText_CantBuyKeyItem);

@@ -467,6 +467,7 @@ static const u8 sText_DontBeAThief[] = _("Don't be a thief!");
 // area name buffered by GetMapName.
 static const u8 sText_NuzlockeAreaSpent[] = _("You already had your chance\nat {B_COPY_VAR_1}!");
 static const u8 sText_NuzlockeDuplicate[] = _("You already own a {B_COPY_VAR_1}!\nKeep looking for a new one!");
+static const u8 sText_PkmnFoundItem[] = _("{B_BUFF1} found\none {B_BUFF2}!");
 static const u8 sText_ItDodgedBall[] = _("It dodged the thrown BALL!\nThis POKéMON can't be caught!");
 static const u8 sText_YouMissedPkmn[] = _("You missed the POKéMON!");
 static const u8 sText_PkmnBrokeFree[] = _("Oh, no!\nThe POKéMON broke free!");
@@ -894,6 +895,7 @@ const u8 *const gBattleStringsTable[BATTLESTRINGS_COUNT - BATTLESTRINGS_TABLE_ST
     [STRINGID_TRAINER2WINTEXT - BATTLESTRINGS_TABLE_START] = sText_Trainer2WinText,
     [STRINGID_NUZLOCKEAREASPENT - BATTLESTRINGS_TABLE_START] = sText_NuzlockeAreaSpent,
     [STRINGID_NUZLOCKEDUPLICATE - BATTLESTRINGS_TABLE_START] = sText_NuzlockeDuplicate,
+    [STRINGID_PKMNFOUNDITEM - BATTLESTRINGS_TABLE_START] = sText_PkmnFoundItem,
 };
 
 // Nuzlocke rules 3 & 4: which refusal message a blocked ball throw prints.

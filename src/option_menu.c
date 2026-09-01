@@ -3,6 +3,7 @@
 #include "bg.h"
 #include "gpu_regs.h"
 #include "international_string_util.h"
+#include "key_system.h"
 #include "main.h"
 #include "menu.h"
 #include "palette.h"
@@ -19,19 +20,18 @@
 #define tMenuSelection data[0]
 #define tTextSpeed data[1]
 #define tBattleSceneOff data[2]
-#define tBattleStyle data[3]
-#define tSound data[4]
-#define tButtonMode data[5]
-#define tWindowFrameType data[6]
+#define tSound data[3]
+#define tButtonMode data[4]
+#define tWindowFrameType data[5]
 
 enum
 {
     MENUITEM_TEXTSPEED,
     MENUITEM_BATTLESCENE,
-    MENUITEM_BATTLESTYLE,
     MENUITEM_SOUND,
     MENUITEM_BUTTONMODE,
     MENUITEM_FRAMETYPE,
+    MENUITEM_KEYSYSTEM, // opens a screen of its own rather than holding a value
     MENUITEM_CANCEL,
     MENUITEM_COUNT,
 };
@@ -42,24 +42,29 @@ enum
     WIN_OPTIONS
 };
 
-#define YPOS_TEXTSPEED    (MENUITEM_TEXTSPEED * 16)
-#define YPOS_BATTLESCENE  (MENUITEM_BATTLESCENE * 16)
-#define YPOS_BATTLESTYLE  (MENUITEM_BATTLESTYLE * 16)
-#define YPOS_SOUND        (MENUITEM_SOUND * 16)
-#define YPOS_BUTTONMODE   (MENUITEM_BUTTONMODE * 16)
-#define YPOS_FRAMETYPE    (MENUITEM_FRAMETYPE * 16)
+// The WIN_OPTIONS window is exactly this many rows tall, and it cannot grow:
+// the seventh row already ends at y=152, the bottom of the screen. The list
+// slides rather than growing whenever there are more items than that.
+//
+// There are exactly seven now that BATTLE STYLE has moved to the nuzlocke rules
+// screen, so nothing currently scrolls -- sScrollOffset can only be 0. The
+// machinery is kept because this list has already outgrown the window once.
+#define VISIBLE_ITEMS 7
 
 static void Task_OptionMenuFadeIn(u8 taskId);
 static void Task_OptionMenuProcessInput(u8 taskId);
 static void Task_OptionMenuSave(u8 taskId);
 static void Task_OptionMenuFadeOut(u8 taskId);
+static void Task_OptionMenuOpenKeySystem(u8 taskId);
+static void Task_OptionMenuFadeOutToKeySystem(u8 taskId);
+static void CommitOptionMenuChoices(u8 taskId);
 static void HighlightOptionMenuItem(u8 selection);
+static void ScrollToOptionMenuItem(u8 taskId);
+static void RedrawOptionMenuWindow(u8 taskId);
 static u8 TextSpeed_ProcessInput(u8 selection);
 static void TextSpeed_DrawChoices(u8 selection);
 static u8 BattleScene_ProcessInput(u8 selection);
 static void BattleScene_DrawChoices(u8 selection);
-static u8 BattleStyle_ProcessInput(u8 selection);
-static void BattleStyle_DrawChoices(u8 selection);
 static u8 Sound_ProcessInput(u8 selection);
 static void Sound_DrawChoices(u8 selection);
 static u8 FrameType_ProcessInput(u8 selection);
@@ -72,6 +77,26 @@ static void DrawBgWindowFrames(void);
 
 EWRAM_DATA static bool8 sArrowPressed = FALSE;
 
+// Which item is drawn on the top row of the list.
+EWRAM_DATA static u8 sScrollOffset = 0;
+
+// Where the cursor starts on the next entry. The key system menu comes back
+// here when it closes, and dropping the player back on TEXT SPEED every time
+// would lose their place. Cleared once it has been used.
+EWRAM_DATA static u8 sInitialSelection = 0;
+
+static bool32 IsItemVisible(u32 item)
+{
+    return item >= sScrollOffset && item < sScrollOffset + VISIBLE_ITEMS;
+}
+
+// Only meaningful for a visible item -- everything that draws a row asks
+// IsItemVisible first, because an item above the window would underflow here.
+static u8 ItemYPos(u32 item)
+{
+    return (item - sScrollOffset) * 16;
+}
+
 static const u16 sOptionMenuText_Pal[] = INCGFX_U16("graphics/interface/option_menu_text.pal", ".gbapal");
 // note: this is only used in the Japanese release
 static const u8 sEqualSignGfx[] = INCGFX_U8("graphics/interface/option_menu_equals_sign.png", ".4bpp");
@@ -80,10 +105,10 @@ static const u8 *const sOptionMenuItemsNames[MENUITEM_COUNT] =
 {
     [MENUITEM_TEXTSPEED]   = gText_TextSpeed,
     [MENUITEM_BATTLESCENE] = gText_BattleScene,
-    [MENUITEM_BATTLESTYLE] = gText_BattleStyle,
     [MENUITEM_SOUND]       = gText_Sound,
     [MENUITEM_BUTTONMODE]  = gText_ButtonMode,
     [MENUITEM_FRAMETYPE]   = gText_Frame,
+    [MENUITEM_KEYSYSTEM]   = gText_KeySystem,
     [MENUITEM_CANCEL]      = gText_OptionMenuCancel,
 };
 
@@ -156,6 +181,9 @@ void CB2_InitOptionMenu(void)
     default:
     case 0:
         SetVBlankCallback(NULL);
+        // Settled here rather than with the rest of the task setup because the
+        // row labels are drawn from it several states before that.
+        sScrollOffset = (sInitialSelection < VISIBLE_ITEMS) ? 0 : sInitialSelection - VISIBLE_ITEMS + 1;
         gMain.state++;
         break;
     case 1:
@@ -227,24 +255,25 @@ void CB2_InitOptionMenu(void)
     {
         u8 taskId = CreateTask(Task_OptionMenuFadeIn, 0);
 
-        gTasks[taskId].tMenuSelection = 0;
-        gTasks[taskId].tTextSpeed = gSaveBlock2Ptr->optionsTextSpeed;
+        // Returning from the key system menu resumes on its row; every other
+        // entry starts at the top. sScrollOffset was already settled back in
+        // case 0, before the row labels were drawn from it.
+        gTasks[taskId].tMenuSelection = sInitialSelection;
+        sInitialSelection = 0;
+
+        // The row only offers FAST and INSTANT, so a save still holding SLOW or
+        // MID is shown -- and committed -- as FAST. Without this the row would
+        // open with neither choice lit.
+        gTasks[taskId].tTextSpeed = (gSaveBlock2Ptr->optionsTextSpeed < OPTIONS_TEXT_SPEED_FAST)
+                                  ? OPTIONS_TEXT_SPEED_FAST
+                                  : gSaveBlock2Ptr->optionsTextSpeed;
         gTasks[taskId].tBattleSceneOff = gSaveBlock2Ptr->optionsBattleSceneOff;
-        // Nuzlocke rule 5: shown as SET even if the save still holds SHIFT.
-        gTasks[taskId].tBattleStyle = OPTIONS_BATTLE_STYLE_SET;
         gTasks[taskId].tSound = gSaveBlock2Ptr->optionsSound;
         gTasks[taskId].tButtonMode = gSaveBlock2Ptr->optionsButtonMode;
         gTasks[taskId].tWindowFrameType = gSaveBlock2Ptr->optionsWindowFrameType;
 
-        TextSpeed_DrawChoices(gTasks[taskId].tTextSpeed);
-        BattleScene_DrawChoices(gTasks[taskId].tBattleSceneOff);
-        BattleStyle_DrawChoices(gTasks[taskId].tBattleStyle);
-        Sound_DrawChoices(gTasks[taskId].tSound);
-        ButtonMode_DrawChoices(gTasks[taskId].tButtonMode);
-        FrameType_DrawChoices(gTasks[taskId].tWindowFrameType);
+        RedrawOptionMenuWindow(taskId);
         HighlightOptionMenuItem(gTasks[taskId].tMenuSelection);
-
-        CopyWindowToVram(WIN_OPTIONS, COPYWIN_FULL);
         gMain.state++;
         break;
     }
@@ -268,6 +297,8 @@ static void Task_OptionMenuProcessInput(u8 taskId)
     {
         if (gTasks[taskId].tMenuSelection == MENUITEM_CANCEL)
             gTasks[taskId].func = Task_OptionMenuSave;
+        else if (gTasks[taskId].tMenuSelection == MENUITEM_KEYSYSTEM)
+            gTasks[taskId].func = Task_OptionMenuOpenKeySystem;
     }
     else if (JOY_NEW(B_BUTTON))
     {
@@ -279,6 +310,7 @@ static void Task_OptionMenuProcessInput(u8 taskId)
             gTasks[taskId].tMenuSelection--;
         else
             gTasks[taskId].tMenuSelection = MENUITEM_CANCEL;
+        ScrollToOptionMenuItem(taskId);
         HighlightOptionMenuItem(gTasks[taskId].tMenuSelection);
     }
     else if (JOY_NEW(DPAD_DOWN))
@@ -287,6 +319,7 @@ static void Task_OptionMenuProcessInput(u8 taskId)
             gTasks[taskId].tMenuSelection++;
         else
             gTasks[taskId].tMenuSelection = 0;
+        ScrollToOptionMenuItem(taskId);
         HighlightOptionMenuItem(gTasks[taskId].tMenuSelection);
     }
     else
@@ -308,13 +341,6 @@ static void Task_OptionMenuProcessInput(u8 taskId)
 
             if (previousOption != gTasks[taskId].tBattleSceneOff)
                 BattleScene_DrawChoices(gTasks[taskId].tBattleSceneOff);
-            break;
-        case MENUITEM_BATTLESTYLE:
-            previousOption = gTasks[taskId].tBattleStyle;
-            gTasks[taskId].tBattleStyle = BattleStyle_ProcessInput(gTasks[taskId].tBattleStyle);
-
-            if (previousOption != gTasks[taskId].tBattleStyle)
-                BattleStyle_DrawChoices(gTasks[taskId].tBattleStyle);
             break;
         case MENUITEM_SOUND:
             previousOption = gTasks[taskId].tSound;
@@ -349,15 +375,53 @@ static void Task_OptionMenuProcessInput(u8 taskId)
     }
 }
 
-static void Task_OptionMenuSave(u8 taskId)
+// Draws the whole list -- labels and values -- for the current scroll offset.
+static void RedrawOptionMenuWindow(u8 taskId)
+{
+    DrawOptionMenuTexts();
+    TextSpeed_DrawChoices(gTasks[taskId].tTextSpeed);
+    BattleScene_DrawChoices(gTasks[taskId].tBattleSceneOff);
+    Sound_DrawChoices(gTasks[taskId].tSound);
+    ButtonMode_DrawChoices(gTasks[taskId].tButtonMode);
+    FrameType_DrawChoices(gTasks[taskId].tWindowFrameType);
+    CopyWindowToVram(WIN_OPTIONS, COPYWIN_FULL);
+}
+
+// Slides the window by the least it can to bring the selection back into view.
+// The highlight bar itself is a hardware window over fixed screen rows, so it
+// is the list that has to move under it.
+static void ScrollToOptionMenuItem(u8 taskId)
+{
+    u8 selection = gTasks[taskId].tMenuSelection;
+    u8 offset = sScrollOffset;
+
+    if (selection < offset)
+        offset = selection;
+    else if (selection >= offset + VISIBLE_ITEMS)
+        offset = selection - VISIBLE_ITEMS + 1;
+
+    if (offset == sScrollOffset)
+        return;
+
+    sScrollOffset = offset;
+    RedrawOptionMenuWindow(taskId);
+}
+
+// Split out of Task_OptionMenuSave because the trip into the key system menu
+// also has to commit -- it tears this screen down and rebuilds it from the save
+// block afterwards, so anything left uncommitted would be silently reverted.
+static void CommitOptionMenuChoices(u8 taskId)
 {
     gSaveBlock2Ptr->optionsTextSpeed = gTasks[taskId].tTextSpeed;
     gSaveBlock2Ptr->optionsBattleSceneOff = gTasks[taskId].tBattleSceneOff;
-    // Nuzlocke rule 5: correct a save that still holds SHIFT on the way out.
-    gSaveBlock2Ptr->optionsBattleStyle = OPTIONS_BATTLE_STYLE_SET;
     gSaveBlock2Ptr->optionsSound = gTasks[taskId].tSound;
     gSaveBlock2Ptr->optionsButtonMode = gTasks[taskId].tButtonMode;
     gSaveBlock2Ptr->optionsWindowFrameType = gTasks[taskId].tWindowFrameType;
+}
+
+static void Task_OptionMenuSave(u8 taskId)
+{
+    CommitOptionMenuChoices(taskId);
 
     BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
     gTasks[taskId].func = Task_OptionMenuFadeOut;
@@ -373,10 +437,40 @@ static void Task_OptionMenuFadeOut(u8 taskId)
     }
 }
 
+// Hands over to the key system menu, which comes back here when it closes.
+// gMain.savedCallback is deliberately left alone: it still points at whatever
+// opened this screen -- the main menu or the field -- and that is where the
+// player should end up once they are done with both.
+static void Task_OptionMenuOpenKeySystem(u8 taskId)
+{
+    CommitOptionMenuChoices(taskId);
+    sInitialSelection = MENUITEM_KEYSYSTEM;
+
+    BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
+    gTasks[taskId].func = Task_OptionMenuFadeOutToKeySystem;
+}
+
+static void Task_OptionMenuFadeOutToKeySystem(u8 taskId)
+{
+    if (!gPaletteFade.active)
+    {
+        DestroyTask(taskId);
+        FreeAllWindowBuffers();
+        // Rewound by hand: this callback leaves gMain.state at the end of its
+        // own staircase, and the key system menu walks an identical one.
+        gMain.state = 0;
+        SetMainCallback2(CB2_InitKeySystemMenu);
+    }
+}
+
+// Takes the item's index, converted to the row it currently occupies -- the
+// highlight is a hardware window over fixed screen rows, not over the list.
 static void HighlightOptionMenuItem(u8 index)
 {
+    u8 row = index - sScrollOffset;
+
     SetGpuReg(REG_OFFSET_WIN0H, WIN_RANGE(16, DISPLAY_WIDTH - 16));
-    SetGpuReg(REG_OFFSET_WIN0V, WIN_RANGE(index * 16 + 40, index * 16 + 56));
+    SetGpuReg(REG_OFFSET_WIN0V, WIN_RANGE(row * 16 + 40, row * 16 + 56));
 }
 
 static void DrawOptionMenuChoice(const u8 *text, u8 x, u8 y, u8 style)
@@ -397,50 +491,40 @@ static void DrawOptionMenuChoice(const u8 *text, u8 x, u8 y, u8 style)
     AddTextPrinterParameterized(WIN_OPTIONS, FONT_NORMAL, dst, x, y + 1, TEXT_SKIP_DRAW, NULL);
 }
 
+// The row offers FAST and INSTANT only. All four speeds would measure 108px in
+// the 94px the choices get, and the two slow ones are of no use to anybody, so
+// they are dropped from the menu rather than the game -- a save that still holds
+// one keeps printing at that speed until the player opens this screen.
 static u8 TextSpeed_ProcessInput(u8 selection)
 {
-    if (JOY_NEW(DPAD_RIGHT))
+    if (JOY_NEW(DPAD_LEFT | DPAD_RIGHT))
     {
-        if (selection <= 1)
-            selection++;
-        else
-            selection = 0;
-
+        selection = (selection == OPTIONS_TEXT_SPEED_FAST)
+                  ? OPTIONS_TEXT_SPEED_INSTANT
+                  : OPTIONS_TEXT_SPEED_FAST;
         sArrowPressed = TRUE;
     }
-    if (JOY_NEW(DPAD_LEFT))
-    {
-        if (selection != 0)
-            selection--;
-        else
-            selection = 2;
 
-        sArrowPressed = TRUE;
-    }
     return selection;
 }
 
 static void TextSpeed_DrawChoices(u8 selection)
 {
-    u8 styles[3];
-    s32 widthSlow, widthMid, widthFast, xMid;
+    u8 styles[2];
+    u8 y;
+
+    // Every row draw starts this way: a row scrolled out of the window has no
+    // y to draw at, and asking ItemYPos for one would underflow.
+    if (!IsItemVisible(MENUITEM_TEXTSPEED))
+        return;
+    y = ItemYPos(MENUITEM_TEXTSPEED);
 
     styles[0] = 0;
     styles[1] = 0;
-    styles[2] = 0;
-    styles[selection] = 1;
+    styles[selection == OPTIONS_TEXT_SPEED_INSTANT] = 1;
 
-    DrawOptionMenuChoice(gText_TextSpeedSlow, 104, YPOS_TEXTSPEED, styles[0]);
-
-    widthSlow = GetStringWidth(FONT_NORMAL, gText_TextSpeedSlow, 0);
-    widthMid = GetStringWidth(FONT_NORMAL, gText_TextSpeedMid, 0);
-    widthFast = GetStringWidth(FONT_NORMAL, gText_TextSpeedFast, 0);
-
-    widthMid -= 94;
-    xMid = (widthSlow - widthMid - widthFast) / 2 + 104;
-    DrawOptionMenuChoice(gText_TextSpeedMid, xMid, YPOS_TEXTSPEED, styles[1]);
-
-    DrawOptionMenuChoice(gText_TextSpeedFast, GetStringRightAlignXOffset(FONT_NORMAL, gText_TextSpeedFast, 198), YPOS_TEXTSPEED, styles[2]);
+    DrawOptionMenuChoice(gText_TextSpeedFast, 104, y, styles[0]);
+    DrawOptionMenuChoice(gText_TextSpeedInstant, GetStringRightAlignXOffset(FONT_NORMAL, gText_TextSpeedInstant, 198), y, styles[1]);
 }
 
 static u8 BattleScene_ProcessInput(u8 selection)
@@ -457,33 +541,18 @@ static u8 BattleScene_ProcessInput(u8 selection)
 static void BattleScene_DrawChoices(u8 selection)
 {
     u8 styles[2];
+    u8 y;
+
+    if (!IsItemVisible(MENUITEM_BATTLESCENE))
+        return;
+    y = ItemYPos(MENUITEM_BATTLESCENE);
 
     styles[0] = 0;
     styles[1] = 0;
     styles[selection] = 1;
 
-    DrawOptionMenuChoice(gText_BattleSceneOn, 104, YPOS_BATTLESCENE, styles[0]);
-    DrawOptionMenuChoice(gText_BattleSceneOff, GetStringRightAlignXOffset(FONT_NORMAL, gText_BattleSceneOff, 198), YPOS_BATTLESCENE, styles[1]);
-}
-
-// Nuzlocke rule 5: the battle style is locked to SET, so this row is display
-// only. Input is deliberately not consumed and sArrowPressed is left alone, so
-// pressing left/right makes no click that would imply something changed.
-static u8 BattleStyle_ProcessInput(u8 selection)
-{
-    return OPTIONS_BATTLE_STYLE_SET;
-}
-
-static void BattleStyle_DrawChoices(u8 selection)
-{
-    u8 styles[2];
-
-    styles[0] = 0;
-    styles[1] = 0;
-    styles[selection] = 1;
-
-    DrawOptionMenuChoice(gText_BattleStyleShift, 104, YPOS_BATTLESTYLE, styles[0]);
-    DrawOptionMenuChoice(gText_BattleStyleSet, GetStringRightAlignXOffset(FONT_NORMAL, gText_BattleStyleSet, 198), YPOS_BATTLESTYLE, styles[1]);
+    DrawOptionMenuChoice(gText_BattleSceneOn, 104, y, styles[0]);
+    DrawOptionMenuChoice(gText_BattleSceneOff, GetStringRightAlignXOffset(FONT_NORMAL, gText_BattleSceneOff, 198), y, styles[1]);
 }
 
 static u8 Sound_ProcessInput(u8 selection)
@@ -501,13 +570,18 @@ static u8 Sound_ProcessInput(u8 selection)
 static void Sound_DrawChoices(u8 selection)
 {
     u8 styles[2];
+    u8 y;
+
+    if (!IsItemVisible(MENUITEM_SOUND))
+        return;
+    y = ItemYPos(MENUITEM_SOUND);
 
     styles[0] = 0;
     styles[1] = 0;
     styles[selection] = 1;
 
-    DrawOptionMenuChoice(gText_SoundMono, 104, YPOS_SOUND, styles[0]);
-    DrawOptionMenuChoice(gText_SoundStereo, GetStringRightAlignXOffset(FONT_NORMAL, gText_SoundStereo, 198), YPOS_SOUND, styles[1]);
+    DrawOptionMenuChoice(gText_SoundMono, 104, y, styles[0]);
+    DrawOptionMenuChoice(gText_SoundStereo, GetStringRightAlignXOffset(FONT_NORMAL, gText_SoundStereo, 198), y, styles[1]);
 }
 
 static u8 FrameType_ProcessInput(u8 selection)
@@ -541,7 +615,12 @@ static void FrameType_DrawChoices(u8 selection)
 {
     u8 text[16];
     u8 n = selection + 1;
+    u8 y;
     u16 i;
+
+    if (!IsItemVisible(MENUITEM_FRAMETYPE))
+        return;
+    y = ItemYPos(MENUITEM_FRAMETYPE);
 
     for (i = 0; gText_FrameTypeNumber[i] != EOS && i <= 5; i++)
         text[i] = gText_FrameTypeNumber[i];
@@ -564,8 +643,8 @@ static void FrameType_DrawChoices(u8 selection)
 
     text[i] = EOS;
 
-    DrawOptionMenuChoice(gText_FrameType, 104, YPOS_FRAMETYPE, 0);
-    DrawOptionMenuChoice(text, 128, YPOS_FRAMETYPE, 1);
+    DrawOptionMenuChoice(gText_FrameType, 104, y, 0);
+    DrawOptionMenuChoice(text, 128, y, 1);
 }
 
 static u8 ButtonMode_ProcessInput(u8 selection)
@@ -595,13 +674,18 @@ static void ButtonMode_DrawChoices(u8 selection)
 {
     s32 widthNormal, widthLR, widthLA, xLR;
     u8 styles[3];
+    u8 y;
+
+    if (!IsItemVisible(MENUITEM_BUTTONMODE))
+        return;
+    y = ItemYPos(MENUITEM_BUTTONMODE);
 
     styles[0] = 0;
     styles[1] = 0;
     styles[2] = 0;
     styles[selection] = 1;
 
-    DrawOptionMenuChoice(gText_ButtonTypeNormal, 104, YPOS_BUTTONMODE, styles[0]);
+    DrawOptionMenuChoice(gText_ButtonTypeNormal, 104, y, styles[0]);
 
     widthNormal = GetStringWidth(FONT_NORMAL, gText_ButtonTypeNormal, 0);
     widthLR = GetStringWidth(FONT_NORMAL, gText_ButtonTypeLR, 0);
@@ -609,9 +693,9 @@ static void ButtonMode_DrawChoices(u8 selection)
 
     widthLR -= 94;
     xLR = (widthNormal - widthLR - widthLA) / 2 + 104;
-    DrawOptionMenuChoice(gText_ButtonTypeLR, xLR, YPOS_BUTTONMODE, styles[1]);
+    DrawOptionMenuChoice(gText_ButtonTypeLR, xLR, y, styles[1]);
 
-    DrawOptionMenuChoice(gText_ButtonTypeLEqualsA, GetStringRightAlignXOffset(FONT_NORMAL, gText_ButtonTypeLEqualsA, 198), YPOS_BUTTONMODE, styles[2]);
+    DrawOptionMenuChoice(gText_ButtonTypeLEqualsA, GetStringRightAlignXOffset(FONT_NORMAL, gText_ButtonTypeLEqualsA, 198), y, styles[2]);
 }
 
 static void DrawHeaderText(void)
@@ -626,8 +710,10 @@ static void DrawOptionMenuTexts(void)
     u8 i;
 
     FillWindowPixelBuffer(WIN_OPTIONS, PIXEL_FILL(1));
-    for (i = 0; i < MENUITEM_COUNT; i++)
-        AddTextPrinterParameterized(WIN_OPTIONS, FONT_NORMAL, sOptionMenuItemsNames[i], 8, (i * 16) + 1, TEXT_SKIP_DRAW, NULL);
+    // i is the row on screen; the item it shows depends on where the list has
+    // been scrolled to.
+    for (i = 0; i < VISIBLE_ITEMS; i++)
+        AddTextPrinterParameterized(WIN_OPTIONS, FONT_NORMAL, sOptionMenuItemsNames[sScrollOffset + i], 8, (i * 16) + 1, TEXT_SKIP_DRAW, NULL);
     CopyWindowToVram(WIN_OPTIONS, COPYWIN_FULL);
 }
 

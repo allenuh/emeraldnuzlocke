@@ -33,6 +33,10 @@ void Task_UseDigEscapeRopeOnField(u8 taskId);
 bool8 CanUseDigOrEscapeRopeOnCurMap(void);
 u8 CheckIfItemIsTMHMOrEvolutionStone(u16 itemId);
 
+// Script specials for the prompt shown when a Repel wears off.
+bool8 TryPrepareRepelReuse(void);
+void UseRepelFromPrompt(void);
+
 enum ItemTMHMOrEvolutionStone
 {
     ITEM_IS_OTHER,

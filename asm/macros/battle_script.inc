@@ -1438,3 +1438,10 @@
 	.macro jumpifnotbattletype flags:req, jumpptr:req
 	jumpifword CMP_NO_COMMON_BITS, gBattleTypeFlags, \flags, \jumpptr
 	.endm
+
+	@ Buffers the next "found an item" message left over by pickup, and falls
+	@ through so the caller can print it. Jumps to \jumpptr once none are left.
+	.macro trypickupmessage jumpptr:req
+	.byte B_SCR_OP_TRYPICKUPMESSAGE
+	.4byte \jumpptr
+	.endm

@@ -31,6 +31,7 @@
 #include "item.h"
 #include "item_menu.h"
 #include "item_use.h"
+#include "key_system.h"
 #include "link.h"
 #include "link_rfu.h"
 #include "mail.h"
@@ -4776,7 +4777,9 @@ static void Task_LearnedMove(u8 taskId)
     if (move[1] == 0)
     {
         AdjustFriendship(mon, FRIENDSHIP_EVENT_LEARN_TMHM);
-        if (item < ITEM_HM01)
+        // Key system: a TM that is taught but not spent is reusable, which is
+        // how TMs work from Gen 5 on. HMs were already exempt below.
+        if (item < ITEM_HM01 && !KeySystemInfiniteTMs())
             RemoveBagItem(item, 1);
     }
     GetMonNickname(mon, gStringVar1);
@@ -4986,7 +4989,12 @@ void ItemUseCB_RareCandy(u8 taskId, TaskFunc task)
         gPartyMenuUseExitCallback = TRUE;
         PlayFanfareByFanfareNum(FANFARE_LEVEL_UP);
         UpdateMonDisplayInfoAfterRareCandy(gPartyMenu.slotId, mon);
-        RemoveBagItem(gSpecialVar_ItemId, 1);
+        // Key system: the stack is bottomless, so the candy is used but not
+        // spent. This is the one place a Rare Candy is consumed, so it is the
+        // only guard needed -- and guarding here rather than in RemoveBagItem
+        // is what keeps *selling* one from being free money.
+        if (!KeySystemInfiniteRareCandy())
+            RemoveBagItem(gSpecialVar_ItemId, 1);
         GetMonNickname(mon, gStringVar1);
         ConvertIntToDecimalStringN(gStringVar2, GetMonData(mon, MON_DATA_LEVEL), STR_CONV_MODE_LEFT_ALIGN, 3);
         StringExpandPlaceholders(gStringVar4, gText_PkmnElevatedToLvVar2);

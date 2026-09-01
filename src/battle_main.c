@@ -3091,12 +3091,13 @@ static void BattleStartClearSetData(void)
         gHitMarker |= HITMARKER_NO_ANIMATIONS;
     }
 
-    // Nuzlocke rule 5: battle style is locked to SET. SHIFT hands the player a
-    // free switch every time the opponent sends out a new Pokemon, which
-    // removes most of the risk the other rules exist to create. Forcing it here
-    // rather than trusting the saved option means the "want to switch?" prompt
-    // can never appear, whatever the save data holds.
-    gBattleScripting.battleStyle = OPTIONS_BATTLE_STYLE_SET;
+    // Nuzlocke rule 5: SHIFT hands the player a free switch every time the
+    // opponent sends out a new Pokemon, which removes most of the risk the other
+    // rules exist to create, so the run's own setting decides it here rather
+    // than the saved option -- which no longer has a row in the options menu.
+    gBattleScripting.battleStyle = NuzlockeBattleStyleIsSet()
+                                 ? OPTIONS_BATTLE_STYLE_SET
+                                 : OPTIONS_BATTLE_STYLE_SHIFT;
 
     gMultiHitCounter = 0;
     gBattleOutcome = 0;

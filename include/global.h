@@ -529,7 +529,19 @@ struct SaveBlock2
              //u16 padding1:4;
              //u16 padding2;
     /*0x18*/ struct Pokedex pokedex;
-    /*0x90*/ u8 filler_90[0x8];
+    // Key system: opt-in modifiers that sit outside the normal options. Stored
+    // beside them because they are set from the same screen and committed by the
+    // same save. Carved out of what was filler_90[0x8]; the fields still total 8
+    // bytes, so every offset below is unchanged and existing saves stay valid.
+    //
+    // A save written before the key system existed reads back zero from all
+    // three, which is why zero means "play normally" in every one of them --
+    // see KEY_EXP_MODIFIER_UNSET.
+    /*0x90*/ u8 keyExpModifier;       // KEY_EXP_MODIFIER_*
+    /*0x91*/ u8 keyInfiniteRareCandy; // the bag's Rare Candy stack never runs out
+    /*0x92*/ u8 keyRareCandyGranted;  // that stack came from the key, so turning it off can take it back
+    /*0x93*/ u8 keyInfiniteTMs;       // a TM is taught but not spent
+    /*0x94*/ u8 unused_94[4];
     /*0x98*/ struct Time localTimeOffset;
     /*0xA0*/ struct Time lastBerryTreeUpdate;
     /*0xA8*/ u32 gcnLinkFlags; // Read by Pokémon Colosseum/XD

@@ -1053,10 +1053,11 @@ void Bike_HandleBumpySlopeJump(void)
     }
 }
 
+// Running indoors: the map's own allowRunning flag is deliberately ignored, so
+// only the metatile can still refuse -- doorways, warps, stairs and the like
+// keep the walk they need. Every map that clears the flag is indoors or a secret
+// base, apart from the unused Route104_Prototype, so nothing else is affected.
 bool32 IsRunningDisallowed(u8 metatile)
 {
-    if (!gMapHeader.allowRunning || IsRunningDisallowedByMetatile(metatile) == TRUE)
-        return TRUE;
-    else
-        return FALSE;
+    return IsRunningDisallowedByMetatile(metatile) == TRUE;
 }

@@ -381,8 +381,10 @@
 // Nuzlocke rules 3 & 4: why a ball throw was refused.
 #define STRINGID_NUZLOCKEAREASPENT          381
 #define STRINGID_NUZLOCKEDUPLICATE          382
+// What a Pokémon with Pickup came away with.
+#define STRINGID_PKMNFOUNDITEM              383
 
-#define BATTLESTRINGS_COUNT                 383
+#define BATTLESTRINGS_COUNT                 384
 
 // This is the string id that gBattleStringsTable starts with.
 // String ids before this (e.g. STRINGID_INTROMSG) are not in the table,

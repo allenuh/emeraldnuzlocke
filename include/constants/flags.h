@@ -43,28 +43,35 @@
 #define TEMP_FLAGS_END   FLAG_TEMP_1F
 #define NUM_TEMP_FLAGS   (TEMP_FLAGS_END - TEMP_FLAGS_START + 1)
 
-#define FLAG_UNUSED_0x020    0x20 // Unused Flag
-#define FLAG_UNUSED_0x021    0x21 // Unused Flag
-#define FLAG_UNUSED_0x022    0x22 // Unused Flag
-#define FLAG_UNUSED_0x023    0x23 // Unused Flag
-#define FLAG_UNUSED_0x024    0x24 // Unused Flag
-#define FLAG_UNUSED_0x025    0x25 // Unused Flag
-#define FLAG_UNUSED_0x026    0x26 // Unused Flag
-#define FLAG_UNUSED_0x027    0x27 // Unused Flag
-#define FLAG_UNUSED_0x028    0x28 // Unused Flag
-#define FLAG_UNUSED_0x029    0x29 // Unused Flag
-#define FLAG_UNUSED_0x02A    0x2A // Unused Flag
-#define FLAG_UNUSED_0x02B    0x2B // Unused Flag
-#define FLAG_UNUSED_0x02C    0x2C // Unused Flag
-#define FLAG_UNUSED_0x02D    0x2D // Unused Flag
-#define FLAG_UNUSED_0x02E    0x2E // Unused Flag
-#define FLAG_UNUSED_0x02F    0x2F // Unused Flag
-#define FLAG_UNUSED_0x030    0x30 // Unused Flag
-#define FLAG_UNUSED_0x031    0x31 // Unused Flag
-#define FLAG_UNUSED_0x032    0x32 // Unused Flag
-#define FLAG_UNUSED_0x033    0x33 // Unused Flag
-#define FLAG_UNUSED_0x034    0x34 // Unused Flag
-#define FLAG_UNUSED_0x035    0x35 // Unused Flag
+// Cut trees stay cut. Each cuttable tree is an object event whose flag hides it
+// once removeobject sets it; vanilla gives them all FLAG_TEMP_* ids, which the
+// next map change clears, which is the only reason they grow back. These are the
+// permanent replacements, carved out of what was FLAG_UNUSED_0x020..0x035.
+//
+// Route 110's Trick House puzzle 1 is deliberately not in this list: its eleven
+// trees ARE the puzzle, and cutting them for good would leave it solved.
+#define FLAG_CUT_TREE_PETALBURG_WOODS_1  0x20
+#define FLAG_CUT_TREE_PETALBURG_WOODS_2  0x21
+#define FLAG_CUT_TREE_ROUTE_103_1        0x22
+#define FLAG_CUT_TREE_ROUTE_103_2        0x23
+#define FLAG_CUT_TREE_ROUTE_104          0x24
+#define FLAG_CUT_TREE_ROUTE_111          0x25
+#define FLAG_CUT_TREE_ROUTE_116_1        0x26
+#define FLAG_CUT_TREE_ROUTE_116_2        0x27
+#define FLAG_CUT_TREE_ROUTE_116_3        0x28
+#define FLAG_CUT_TREE_ROUTE_116_4        0x29
+#define FLAG_CUT_TREE_ROUTE_116_5        0x2A
+#define FLAG_CUT_TREE_ROUTE_117          0x2B
+#define FLAG_CUT_TREE_ROUTE_118          0x2C
+#define FLAG_CUT_TREE_ROUTE_120_1        0x2D
+#define FLAG_CUT_TREE_ROUTE_120_2        0x2E
+#define FLAG_CUT_TREE_ROUTE_120_3        0x2F
+#define FLAG_CUT_TREE_ROUTE_121_1        0x30
+#define FLAG_CUT_TREE_ROUTE_121_2        0x31
+#define FLAG_CUT_TREE_ROUTE_121_3        0x32
+#define FLAG_CUT_TREE_ROUTE_123_1        0x33
+#define FLAG_CUT_TREE_ROUTE_123_2        0x34
+#define FLAG_CUT_TREE_ROUTE_123_3        0x35
 #define FLAG_UNUSED_0x036    0x36 // Unused Flag
 #define FLAG_UNUSED_0x037    0x37 // Unused Flag
 #define FLAG_UNUSED_0x038    0x38 // Unused Flag

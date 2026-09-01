@@ -856,12 +856,89 @@ static void Task_UseRepel(u8 taskId)
     if (!IsSEPlaying())
     {
         VarSet(VAR_REPEL_STEP_COUNT, GetItemHoldEffectParam(gSpecialVar_ItemId));
+        // Remembered so that when this one wears off, the prompt can offer
+        // another of the same kind. See TryPrepareRepelReuse.
+        VarSet(VAR_LAST_REPEL_USED, gSpecialVar_ItemId);
         RemoveUsedItem();
         if (CurrentBattlePyramidLocation() == PYRAMID_LOCATION_NONE)
             DisplayItemMessage(taskId, FONT_NORMAL, gStringVar4, CloseItemMessage);
         else
             DisplayItemMessageInBattlePyramid(taskId, gStringVar4, Task_CloseBattlePyramidBagMessage);
     }
+}
+
+// Offering another Repel when one wears off, the way Black 2 / White 2 does.
+//
+// Weakest first, so falling back never spends a Max Repel the player was saving.
+// The one they actually used is preferred over all of them; this order only
+// decides what to reach for once that kind has run out.
+static const u16 sRepelsWeakestFirst[] = { ITEM_REPEL, ITEM_SUPER_REPEL, ITEM_MAX_REPEL };
+
+// Which Repel the prompt is currently offering. Only has to survive from the
+// specialvar that picks it to the special that uses it, a few script lines
+// later, so it is deliberately not saved.
+static EWRAM_DATA u16 sRepelToReuse = ITEM_NONE;
+
+static bool32 IsRepel(u16 itemId)
+{
+    u32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sRepelsWeakestFirst); i++)
+    {
+        if (sRepelsWeakestFirst[i] == itemId)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+// Picks the Repel to offer and buffers its name for the prompt. Returns FALSE if
+// the player has none at all, in which case the script just prints the plain
+// "wore off" message vanilla always showed.
+bool8 TryPrepareRepelReuse(void)
+{
+    u16 lastUsed = VarGet(VAR_LAST_REPEL_USED);
+    u32 i;
+
+    sRepelToReuse = ITEM_NONE;
+
+    // The kind they chose last time, if any are left. IsRepel guards against a
+    // save written before this var meant anything, which reads back as 0.
+    if (IsRepel(lastUsed) && CheckBagHasItem(lastUsed, 1))
+    {
+        sRepelToReuse = lastUsed;
+    }
+    else
+    {
+        for (i = 0; i < ARRAY_COUNT(sRepelsWeakestFirst); i++)
+        {
+            if (CheckBagHasItem(sRepelsWeakestFirst[i], 1))
+            {
+                sRepelToReuse = sRepelsWeakestFirst[i];
+                break;
+            }
+        }
+    }
+
+    if (sRepelToReuse == ITEM_NONE)
+        return FALSE;
+
+    CopyItemName(sRepelToReuse, gStringVar1);
+    return TRUE;
+}
+
+// Mirrors Task_UseRepel above -- same three writes in the same order -- so the
+// bag path and the prompt path cannot drift apart.
+void UseRepelFromPrompt(void)
+{
+    if (sRepelToReuse == ITEM_NONE)
+        return;
+
+    VarSet(VAR_REPEL_STEP_COUNT, GetItemHoldEffectParam(sRepelToReuse));
+    VarSet(VAR_LAST_REPEL_USED, sRepelToReuse);
+    RemoveBagItem(sRepelToReuse, 1);
+    PlaySE(SE_REPEL);
+    sRepelToReuse = ITEM_NONE;
 }
 
 static void Task_UsedBlackWhiteFlute(u8 taskId)

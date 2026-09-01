@@ -2940,6 +2940,14 @@ BattleScript_LocalBattleWonReward::
 BattleScript_PayDayMoneyAndPickUpItems::
 	givepaydaymoney
 	pickup
+@ Announces whatever Pickup turned up. Shared with the Pyramid path below, which
+@ is the other caller of pickup.
+BattleScript_PickupMessages::
+	trypickupmessage BattleScript_PickupMessagesEnd
+	printstring STRINGID_PKMNFOUNDITEM
+	waitmessage B_WAIT_TIME_LONG
+	goto BattleScript_PickupMessages
+BattleScript_PickupMessagesEnd::
 	end2
 
 BattleScript_LocalBattleLost::
@@ -3044,6 +3052,7 @@ BattleScript_FrontierTrainerBattleWon_LoseTexts:
 BattleScript_TryPickUpItems:
 	jumpifnotbattletype BATTLE_TYPE_PYRAMID, BattleScript_FrontierTrainerBattleWon_End
 	pickup
+	goto BattleScript_PickupMessages
 BattleScript_FrontierTrainerBattleWon_End:
 	end2
 

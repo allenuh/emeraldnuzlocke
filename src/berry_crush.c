@@ -1166,6 +1166,9 @@ static void SetNamesAndTextSpeed(struct BerryCrushGame *game)
         game->textSpeed = 4;
         break;
     case OPTIONS_TEXT_SPEED_FAST:
+    // Instant is held at the fast delay here on purpose: this is a link
+    // minigame and the speed is shared with the other players.
+    case OPTIONS_TEXT_SPEED_INSTANT:
         game->textSpeed = 1;
         break;
     }

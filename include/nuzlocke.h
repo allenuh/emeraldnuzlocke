@@ -110,10 +110,29 @@ bool32 NuzlockeMonEarnedExpNormally(u8 partySlot, u32 sentInPokes);
 bool32 NuzlockeIsTrophyCatch(void);
 void NuzlockeFaintTrophyCatch(struct Pokemon *mon);
 
-// Future optional rules claim (1 << 2), (1 << 3), ... here.
-#define NUZLOCKE_RULES_DEFAULT (NUZLOCKE_RULE_RESTART_ON_WHITEOUT | NUZLOCKE_RULE_SHINY_CLAUSE)
+// Rules 5, 6 and 7 were compiled in until the rules menu existed, so their bits
+// are defined as the *departure* from that behaviour rather than the rule
+// itself. A save written before the menu reads zero back for all three, and zero
+// therefore keeps it playing exactly as it always has -- the same reasoning that
+// makes zero the right answer for the two rules above, in the other direction.
+//
+// Read them through the accessors below rather than directly; nothing outside
+// this header should have to hold the inversion in its head.
+#define NUZLOCKE_RULE_BATTLE_STYLE_SHIFT (1 << 2) // rule 5: SHIFT instead of SET
+#define NUZLOCKE_RULE_ALLOW_BAG_ITEMS    (1 << 3) // rule 6: bag usable in battle
+#define NUZLOCKE_RULE_NO_LEVEL_CAPS      (1 << 4) // rule 7: no cap at all
+
+// Future optional rules claim (1 << 5), (1 << 6), ... here.
+//
+// Every default other than the shiny clause is a cleared bit, which is what the
+// inversion above buys: the strict reading of each rule needs no bit set.
+#define NUZLOCKE_RULES_DEFAULT (NUZLOCKE_RULE_SHINY_CLAUSE)
 
 bool32 NuzlockeRuleEnabled(u32 rule);
+
+bool32 NuzlockeBattleStyleIsSet(void);
+bool32 NuzlockeBagItemsAllowedInBattle(void);
+bool32 NuzlockeLevelCapsEnabled(void);
 
 // TRUE once a whiteout has ended this save. Read by the main menu, which then
 // offers NEW GAME only.
@@ -123,9 +142,9 @@ bool32 NuzlockeIsRunOver(void);
 // proceed; TRUE means the run is over and the caller must not continue.
 bool32 NuzlockeTryEndRunOnWhiteOut(void);
 
-// The options menu will run during the Birch speech, but NewGameInitData's
-// ClearSav1 wipes all of SaveBlock1 afterwards -- so choices are staged in EWRAM
-// and copied into the save once the wipe is done.
+// The rules menu runs between NEW GAME and the Birch speech, but
+// NewGameInitData's ClearSav1 wipes all of SaveBlock1 afterwards -- so choices
+// are staged in EWRAM and copied into the save once the wipe is done.
 void NuzlockeStageRuleFlags(u8 flags);
 u8 NuzlockeGetStagedRuleFlags(void);
 void NuzlockeInitRulesForNewGame(void);

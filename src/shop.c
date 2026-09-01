@@ -89,6 +89,10 @@ struct MartInfo
     u16 itemCount;
     u8 windowId;
     u8 martType;
+    // Set on every CreateShopMenu, never left over: sMartInfo is a static that
+    // outlives the shop it describes, and a stale TRUE would make the next
+    // ordinary Poke Mart give its stock away.
+    bool8 isFree;
 };
 
 struct ShopData
@@ -337,14 +341,17 @@ static const u8 sShopBuyMenuTextColors[][3] =
     [COLORID_GRAY_CURSOR] = {0, 3, 2},
 };
 
-static u8 CreateShopMenu(u8 martType)
+static u8 CreateShopMenu(u8 martType, bool8 isFree)
 {
     int numMenuItems;
 
     LockPlayerFieldControls();
     sMartInfo.martType = martType;
+    sMartInfo.isFree = isFree;
 
-    if (martType == MART_TYPE_NORMAL)
+    // A free mart offers BUY and QUIT only. There is no selling to a shop that
+    // charges nothing -- it would buy back its own giveaway.
+    if (martType == MART_TYPE_NORMAL && !isFree)
     {
         struct WindowTemplate winTemplate = sShopMenuWindowTemplates[WIN_BUY_SELL_QUIT];
         winTemplate.width = GetMaxWidthInMenuTable(sShopMenuActions_BuySellQuit, ARRAY_COUNT(sShopMenuActions_BuySellQuit));
@@ -478,7 +485,10 @@ static void Task_ReturnToShopMenu(u8 taskId)
 
 static void ShowShopMenuAfterExitingBuyOrSellMenu(u8 taskId)
 {
-    CreateShopMenu(sMartInfo.martType);
+    // Rebuilding the same shop the player is standing in, so both of the things
+    // that describe it have to be carried over -- a free mart that forgot on the
+    // way back from the buy list would start charging halfway through a visit.
+    CreateShopMenu(sMartInfo.martType, sMartInfo.isFree);
     DestroyTask(taskId);
 }
 
@@ -617,6 +627,17 @@ static void BuyMenuPrintItemDescriptionAndShowItemIcon(s32 item, bool8 onInit, s
     BuyMenuPrint(WIN_ITEM_DESCRIPTION, description, 3, 1, 0, COLORID_NORMAL);
 }
 
+// What this shop charges. A free mart asks nothing, and every money-shaped
+// calculation downstream falls out of that on its own: IsEnoughMoney always
+// passes, RemoveMoney takes nothing, and the list prints a price of 0.
+static u32 BuyMenuGetItemPrice(u16 itemId)
+{
+    if (sMartInfo.isFree)
+        return 0;
+
+    return GetItemPrice(itemId) >> IsPokeNewsActive(POKENEWS_SLATEPORT);
+}
+
 static void BuyMenuPrintPriceInList(u8 windowId, u32 itemId, u8 y)
 {
     u8 x;
@@ -627,7 +648,7 @@ static void BuyMenuPrintPriceInList(u8 windowId, u32 itemId, u8 y)
         {
             ConvertIntToDecimalStringN(
                 gStringVar1,
-                GetItemPrice(itemId) >> IsPokeNewsActive(POKENEWS_SLATEPORT),
+                BuyMenuGetItemPrice(itemId),
                 STR_CONV_MODE_LEFT_ALIGN,
                 5);
         }
@@ -986,7 +1007,7 @@ static void Task_BuyMenu(u8 taskId)
             BuyMenuPrintCursor(tListTaskId, COLORID_GRAY_CURSOR);
 
             if (sMartInfo.martType == MART_TYPE_NORMAL)
-                sShopData->totalCost = (GetItemPrice(itemId) >> IsPokeNewsActive(POKENEWS_SLATEPORT));
+                sShopData->totalCost = BuyMenuGetItemPrice(itemId);
             else
                 sShopData->totalCost = gDecorations[itemId].price;
 
@@ -1043,7 +1064,12 @@ static void Task_BuyHowManyDialogueInit(u8 taskId)
     BuyMenuPrintItemQuantityAndPrice(taskId);
     ScheduleBgCopyTilemapToVram(0);
 
-    maxQuantity = GetMoney(&gSaveBlock1Ptr->money) / sShopData->totalCost;
+    // A free mart has no money limit to divide by -- and would divide by zero
+    // trying. The bag is the only thing that runs out.
+    if (sShopData->totalCost == 0)
+        maxQuantity = MAX_BAG_ITEM_CAPACITY;
+    else
+        maxQuantity = GetMoney(&gSaveBlock1Ptr->money) / sShopData->totalCost;
 
     if (maxQuantity > MAX_BAG_ITEM_CAPACITY)
         sShopData->maxQuantity = MAX_BAG_ITEM_CAPACITY;
@@ -1059,7 +1085,7 @@ static void Task_BuyHowManyDialogueHandleInput(u8 taskId)
 
     if (AdjustQuantityAccordingToDPadInput(&tItemCount, sShopData->maxQuantity) == TRUE)
     {
-        sShopData->totalCost = (GetItemPrice(tItemId) >> IsPokeNewsActive(POKENEWS_SLATEPORT)) * tItemCount;
+        sShopData->totalCost = BuyMenuGetItemPrice(tItemId) * tItemCount;
         BuyMenuPrintItemQuantityAndPrice(taskId);
     }
     else
@@ -1248,7 +1274,19 @@ static void RecordItemPurchase(u8 taskId)
 
 void CreatePokemartMenu(const u16 *itemsForSale)
 {
-    CreateShopMenu(MART_TYPE_NORMAL);
+    CreateShopMenu(MART_TYPE_NORMAL, FALSE);
+    SetShopItemsForSale(itemsForSale);
+    ClearItemPurchases();
+    SetShopMenuCallback(ScriptContext_Enable);
+}
+
+// An ordinary Poke Mart with its prices zeroed. The buy screen already does
+// everything a giveaway needs -- the item list, the icons, the "how many?"
+// counter, the bag-full check -- so what it charges is the only thing worth
+// changing about it.
+void CreateFreeMartMenu(const u16 *itemsForSale)
+{
+    CreateShopMenu(MART_TYPE_NORMAL, TRUE);
     SetShopItemsForSale(itemsForSale);
     ClearItemPurchases();
     SetShopMenuCallback(ScriptContext_Enable);
@@ -1256,14 +1294,14 @@ void CreatePokemartMenu(const u16 *itemsForSale)
 
 void CreateDecorationShop1Menu(const u16 *itemsForSale)
 {
-    CreateShopMenu(MART_TYPE_DECOR);
+    CreateShopMenu(MART_TYPE_DECOR, FALSE);
     SetShopItemsForSale(itemsForSale);
     SetShopMenuCallback(ScriptContext_Enable);
 }
 
 void CreateDecorationShop2Menu(const u16 *itemsForSale)
 {
-    CreateShopMenu(MART_TYPE_DECOR2);
+    CreateShopMenu(MART_TYPE_DECOR2, FALSE);
     SetShopItemsForSale(itemsForSale);
     SetShopMenuCallback(ScriptContext_Enable);
 }

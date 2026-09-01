@@ -18,6 +18,7 @@
 #include "mystery_event_menu.h"
 #include "naming_screen.h"
 #include "nuzlocke.h"
+#include "nuzlocke_rules_menu.h"
 #include "option_menu.h"
 #include "overworld.h"
 #include "palette.h"
@@ -555,6 +556,25 @@ void CB2_ReinitMainMenu(void)
     InitMainMenu(TRUE);
 }
 
+// Coming back from the nuzlocke rules screen, which runs between NEW GAME and
+// the speech. InitMainMenu is reused rather than copied -- the alternative,
+// CB2_NewGameBirchSpeech_ReturnFromNamingScreen below, open-codes forty lines of
+// the same setup -- so the two ways into the speech cannot drift apart. TRUE
+// fades in from black, matching the rules screen's fade out.
+//
+// The task InitMainMenu starts is thrown away unrun: ResetTasks lands in the
+// same frame, before RunTasks ever sees it.
+void CB2_NewGameBirchSpeechAfterNuzlockeRules(void)
+{
+    InitMainMenu(TRUE);
+    ResetTasks();
+    // As the ACTION_NEW_GAME branch does, so the speech's black backdrop does
+    // not flash on the way in.
+    gPlttBufferUnfaded[0] = RGB_BLACK;
+    gPlttBufferFaded[0] = RGB_BLACK;
+    CreateTask(Task_NewGameBirchSpeech_Init, 0);
+}
+
 static u32 InitMainMenu(bool8 returningFromOptionsMenu)
 {
     SetVBlankCallback(NULL);
@@ -1068,9 +1088,13 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
         {
             case ACTION_NEW_GAME:
             default:
-                gPlttBufferUnfaded[0] = RGB_BLACK;
-                gPlttBufferFaded[0] = RGB_BLACK;
-                gTasks[taskId].func = Task_NewGameBirchSpeech_Init;
+                // The run's nuzlocke rules are chosen before it starts, so the
+                // rules screen goes here, between NEW GAME and the speech. It
+                // comes back to CB2_NewGameBirchSpeechAfterNuzlockeRules, or to
+                // the main menu if the player backs out with B.
+                gMain.state = 0;
+                SetMainCallback2(CB2_InitNuzlockeRulesMenu);
+                DestroyTask(taskId);
                 break;
             case ACTION_CONTINUE:
                 gPlttBufferUnfaded[0] = RGB_BLACK;

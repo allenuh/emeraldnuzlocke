@@ -127,6 +127,12 @@
 #define OPTIONS_TEXT_SPEED_SLOW 0
 #define OPTIONS_TEXT_SPEED_MID 1
 #define OPTIONS_TEXT_SPEED_FAST 2
+// SLOW and MID are no longer offered by the options menu, but every table keyed
+// by this constant still carries entries for them: a save made before INSTANT
+// existed can hold either, and must keep printing at the speed it was set to
+// until the player opens the menu. optionsTextSpeed is a 3-bit save field, so
+// the new value costs nothing.
+#define OPTIONS_TEXT_SPEED_INSTANT 3
 
 #define OPTIONS_SOUND_MONO 0
 #define OPTIONS_SOUND_STEREO 1

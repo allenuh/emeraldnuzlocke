@@ -544,3 +544,11 @@ gSpecials::
 @ Nuzlocke rule 2: mandatory nicknames for gift Pokémon.
 	def_special NuzlockeNameReceivedPartyMon, waitstate=1
 	def_special NuzlockeNameReceivedBoxMon, waitstate=1
+
+@ Offering another Repel when one wears off.
+	def_special TryPrepareRepelReuse
+	def_special UseRepelFromPrompt
+
+@ The Surplus Berries box on Route 123. waitstate, because the shop takes over
+@ the screen and the script must not run on until it hands control back.
+	def_special OpenSurplusBerryShop, waitstate=1

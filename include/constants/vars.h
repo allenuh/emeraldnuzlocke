@@ -270,7 +270,9 @@
 #define VAR_UNUSED_0x40FA                                0x40FA // Unused Var
 #define VAR_UNUSED_0x40FB                                0x40FB // Unused Var
 #define VAR_UNUSED_0x40FC                                0x40FC // Unused Var
-#define VAR_UNUSED_0x40FD                                0x40FD // Unused Var
+// Which Repel the player last used, so the prompt that offers another when it
+// wears off can offer the same kind. Carved out of what was VAR_UNUSED_0x40FD.
+#define VAR_LAST_REPEL_USED                              0x40FD
 #define VAR_UNUSED_0x40FE                                0x40FE // Unused Var
 #define VAR_UNUSED_0x40FF                                0x40FF // Unused Var
 

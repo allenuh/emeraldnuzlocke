@@ -77,6 +77,9 @@ static const u8 sWindowVerticalScrollSpeeds[] = {
     [OPTIONS_TEXT_SPEED_SLOW] = 1,
     [OPTIONS_TEXT_SPEED_MID] = 2,
     [OPTIONS_TEXT_SPEED_FAST] = 4,
+    // A whole line height in one step, so the scroll between pages finishes in
+    // the same frame the page did.
+    [OPTIONS_TEXT_SPEED_INSTANT] = 16,
 };
 
 static const struct GlyphWidthFunc sGlyphWidthFuncs[] =
@@ -316,6 +319,22 @@ bool16 AddTextPrinter(struct TextPrinterTemplate *printerTemplate, u8 speed, Tex
     return TRUE;
 }
 
+// Whether this printer should get through its glyphs in a single frame.
+//
+// Deliberately not done by handing AddTextPrinter a speed of 0: that path
+// renders the whole string up front but leaves the printer inactive and spins
+// through any wait state, so a message with a page break would flash its first
+// page, never wait for the player, and let the calling script run straight on.
+// It is only safe for the prompt-free menu text it was written for.
+//
+// Gated on textSpeed as well as the option so that a printer created with a
+// delay of its own -- a minigame, the credits -- is left to keep it.
+static bool32 ShouldPrintInstantly(struct TextPrinter *textPrinter)
+{
+    return textPrinter->textSpeed == 0
+        && GetPlayerTextSpeed() == OPTIONS_TEXT_SPEED_INSTANT;
+}
+
 void RunTextPrinters(void)
 {
     int i;
@@ -327,10 +346,31 @@ void RunTextPrinters(void)
             if (sTextPrinters[i].active)
             {
                 u16 renderCmd = RenderFont(&sTextPrinters[i]);
+                // A glyph was drawn, so the window has to be copied below even
+                // if the run goes on to end on RENDER_FINISH -- a case one glyph
+                // per frame never had to handle, because the finish always
+                // landed on a later frame than the last glyph.
+                bool32 drewGlyph = (renderCmd == RENDER_PRINT);
+
+                // Instant text: keep asking for glyphs in this same frame until
+                // RenderFont stops for a reason of its own -- a pause, a prompt,
+                // a line scroll, the end of the message. Those are exactly the
+                // points the message was going to wait at anyway, so nothing the
+                // player had to read or acknowledge is skipped.
+                if (drewGlyph && ShouldPrintInstantly(&sTextPrinters[i]))
+                {
+                    do
+                    {
+                        renderCmd = RenderFont(&sTextPrinters[i]);
+                    } while (renderCmd == RENDER_PRINT);
+                }
+
+                if (drewGlyph)
+                    CopyWindowToVram(sTextPrinters[i].printerTemplate.windowId, COPYWIN_GFX);
+
                 switch (renderCmd)
                 {
                 case RENDER_PRINT:
-                    CopyWindowToVram(sTextPrinters[i].printerTemplate.windowId, COPYWIN_GFX);
                 case RENDER_UPDATE:
                     if (sTextPrinters[i].callback != NULL)
                         sTextPrinters[i].callback(&sTextPrinters[i].printerTemplate, renderCmd);

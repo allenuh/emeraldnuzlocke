@@ -21,6 +21,7 @@
 #include "battle_anim.h"
 #include "data.h"
 #include "pokemon_summary_screen.h"
+#include "nuzlocke.h"
 #include "strings.h"
 #include "constants/battle_anim.h"
 #include "constants/rgb.h"
@@ -1967,9 +1968,55 @@ static void UpdateNickInHealthbox(u8 healthboxSpriteId, struct Pokemon *mon)
     RemoveWindowOnHealthbox(windowId);
 }
 
+// Nuzlocke rules 3 & 4: what this encounter is worth, drawn in the slot the
+// caught-ball indicator already owns. Its own array rather than more entries on
+// gHealthboxElementsGfxTable, whose indices are positions in an INCBIN list over
+// in graphics.c -- keeping a hand-written enum in step with that list is a
+// standing hazard to take on for one local icon.
+//
+// Same silhouette as the caught ball and the same palette, so the three read as
+// one set: a white ball is free to catch, the vanilla red one is a family
+// already owned, a dark one is an area whose chance is gone.
+static const u8 sNuzlockeIndicatorGfx[][32] = INCBIN_U8("graphics/battle_interface/nuzlocke_encounter_indicator.4bpp");
+
+enum
+{
+    NUZLOCKE_INDICATOR_FIRST_ENCOUNTER,
+    NUZLOCKE_INDICATOR_AREA_SPENT,
+};
+
+// Which of the three balls belongs on the enemy's healthbox, or NULL for none.
+//
+// One slot is enough for all of them because they cannot collide: COUNTS
+// requires that the family is not already owned, and "already owned" is derived
+// from the same Pokédex caught flags the vanilla ball tests, so no Pokémon can
+// ever be both. EXEMPT -- legendaries, scripted battles, anything not generated
+// from a route's encounter table -- keeps the vanilla meaning untouched.
+static const u8 *GetHealthboxEncounterIconGfx(u8 battler)
+{
+    switch (GetNuzlockeEncounterStatus())
+    {
+    case NUZLOCKE_ENCOUNTER_COUNTS:
+    // A shiny the clause rescued is catchable too, and spends nothing, so it
+    // gets the same "go ahead" ball.
+    case NUZLOCKE_ENCOUNTER_SHINY:
+        return sNuzlockeIndicatorGfx[NUZLOCKE_INDICATOR_FIRST_ENCOUNTER];
+    case NUZLOCKE_ENCOUNTER_AREA_SPENT:
+        return sNuzlockeIndicatorGfx[NUZLOCKE_INDICATOR_AREA_SPENT];
+    case NUZLOCKE_ENCOUNTER_DUPLICATE:
+        return GetHealthboxElementGfxPtr(HEALTHBOX_GFX_STATUS_BALL_CAUGHT);
+    default:
+        // EXEMPT: as vanilla, a ball only if the species is already registered.
+        if (GetSetPokedexFlag(SpeciesToNationalPokedexNum(GetMonData(&gEnemyParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES)), FLAG_GET_CAUGHT))
+            return GetHealthboxElementGfxPtr(HEALTHBOX_GFX_STATUS_BALL_CAUGHT);
+        return NULL;
+    }
+}
+
 static void TryAddPokeballIconToHealthbox(u8 healthboxSpriteId, bool8 noStatus)
 {
     u8 battler, healthBarSpriteId;
+    const u8 *iconGfx;
 
     if (gBattleTypeFlags & BATTLE_TYPE_WALLY_TUTORIAL)
         return;
@@ -1979,13 +2026,15 @@ static void TryAddPokeballIconToHealthbox(u8 healthboxSpriteId, bool8 noStatus)
     battler = gSprites[healthboxSpriteId].hMain_Battler;
     if (GetBattlerSide(battler) == B_SIDE_PLAYER)
         return;
-    if (!GetSetPokedexFlag(SpeciesToNationalPokedexNum(GetMonData(&gEnemyParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES)), FLAG_GET_CAUGHT))
+
+    iconGfx = GetHealthboxEncounterIconGfx(battler);
+    if (iconGfx == NULL)
         return;
 
     healthBarSpriteId = gSprites[healthboxSpriteId].hMain_HealthBarSpriteId;
 
     if (noStatus)
-        CpuCopy32(GetHealthboxElementGfxPtr(HEALTHBOX_GFX_STATUS_BALL_CAUGHT), (void *)(OBJ_VRAM0 + (gSprites[healthBarSpriteId].oam.tileNum + 8) * TILE_SIZE_4BPP), 32);
+        CpuCopy32(iconGfx, (void *)(OBJ_VRAM0 + (gSprites[healthBarSpriteId].oam.tileNum + 8) * TILE_SIZE_4BPP), 32);
     else
         CpuFill32(0, (void *)(OBJ_VRAM0 + (gSprites[healthBarSpriteId].oam.tileNum + 8) * TILE_SIZE_4BPP), 32);
 }

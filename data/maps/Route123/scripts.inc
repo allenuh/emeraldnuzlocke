@@ -42,6 +42,20 @@ Route123_EventScript_BerryMastersHouseSign::
 	msgbox Route123_Text_BerryMastersHouse, MSGBOX_SIGN
 	end
 
+Route123_EventScript_SurplusBerriesSign::
+	msgbox Route123_Text_SurplusBerriesSign, MSGBOX_SIGN
+	end
+
+Route123_EventScript_SurplusBerriesBox::
+	lock
+	faceplayer
+	message Route123_Text_SurplusBerriesBox
+	waitmessage
+	special OpenSurplusBerryShop
+	waitstate
+	release
+	end
+
 Route123_EventScript_Wendy::
 	trainerbattle_single TRAINER_WENDY, Route123_Text_WendyIntro, Route123_Text_WendyDefeat
 	msgbox Route123_Text_WendyPostBattle, MSGBOX_AUTOCLOSE
@@ -195,4 +209,12 @@ Route123_Text_RouteSignMtPyre:
 
 Route123_Text_BerryMastersHouse:
 	.string "BERRY MASTER'S HOUSE$"
+
+Route123_Text_SurplusBerriesSign:
+	.string "SURPLUS BERRIES\n"
+	.string "Help yourself!$"
+
+Route123_Text_SurplusBerriesBox:
+	.string "A box of BERRIES the BERRY MASTER\n"
+	.string "couldn't find a use for…$"
 

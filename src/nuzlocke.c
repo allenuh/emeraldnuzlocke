@@ -2,6 +2,7 @@
 #include "nuzlocke.h"
 #include "event_data.h"
 #include "item.h"
+#include "key_system.h"
 #include "main.h"
 #include "naming_screen.h"
 #include "overworld.h"
@@ -369,6 +370,14 @@ static u32 GetBadgeCount(void)
 // replaced -- no vanilla behaviour is lost when the cap is lifted.
 u8 NuzlockeGetLevelCap(void)
 {
+    // Turning the rule off is one line because of the promise above: MAX_LEVEL
+    // means "nothing left to cap against", and every site in the hack is written
+    // to degrade into the vanilla test it replaced when it sees that. So this
+    // gate switches off the lead-benching, the rare candy refusal, the exp clamp
+    // and the daycare clamp together, without any of them knowing about it.
+    if (!NuzlockeLevelCapsEnabled())
+        return MAX_LEVEL;
+
     if (FlagGet(FLAG_DEFEATED_METEOR_FALLS_STEVEN))
         return MAX_LEVEL;
     if (FlagGet(FLAG_SYS_GAME_CLEAR))
@@ -510,6 +519,12 @@ static u32 ApplyExpMultipliers(struct Pokemon *mon, u8 partySlot, u32 exp)
     if (IsTradedMon(mon) && !(gBattleTypeFlags & BATTLE_TYPE_INGAME_PARTNER && partySlot >= 3))
         exp = (exp * 150) / 100;
 
+    // The key system's EXP. MODIFIER goes last, so the level cap clamps and
+    // redirects the amount the player will actually receive rather than the
+    // amount before it. The arithmetic here is u32 even though the vanilla exp
+    // value is a u16, so 5x cannot overflow on the way through.
+    exp = KeySystemApplyExpModifier(exp);
+
     return exp;
 }
 
@@ -549,7 +564,12 @@ void NuzlockeComputeExpAwards(u32 participantExp, u32 shareExp, u32 sentInPokes)
 
     // Hand the pool to whoever still has room, in party order. Redirected exp is
     // not multiplied again; it arrives exactly as the donor would have taken it.
-    for (i = 0; i < PARTY_SIZE && pool != 0; i++)
+    //
+    // The redirect is the one part of the rule the MAX_LEVEL trick above does not
+    // switch off by itself: with no cap, the only Pokémon that overflows is one
+    // at level 100, and vanilla throws that exp away rather than passing it on.
+    // Skipping the loop keeps a caps-off run identical to vanilla.
+    for (i = 0; i < PARTY_SIZE && pool != 0 && NuzlockeLevelCapsEnabled(); i++)
     {
         u32 give = (pool < headroom[i]) ? pool : headroom[i];
 
@@ -632,10 +652,15 @@ void NuzlockeNameReceivedBoxMon(void)
 //
 
 // The rules a new save will be started under. This is staged in EWRAM rather
-// than written straight to the save because the options menu that will set it
-// runs during the Birch speech, and NewGameInitData's ClearSav1 wipes all of
+// than written straight to the save because the rules menu that sets it runs
+// before the Birch speech, and NewGameInitData's ClearSav1 wipes all of
 // SaveBlock1 afterwards -- anything written early would be erased moments later.
 // NuzlockeInitRulesForNewGame copies it across once the wipe is done.
+//
+// The initialiser is documentation, not code: ewram_data is a NOLOAD section, so
+// nothing is copied into it at boot and this actually starts at zero. It does
+// not matter, because the menu always stages a full set of flags before a run
+// can begin -- but do not add a path here that relies on the default.
 static EWRAM_DATA u8 sPendingRuleFlags = NUZLOCKE_RULES_DEFAULT;
 
 void NuzlockeStageRuleFlags(u8 flags)
@@ -658,6 +683,26 @@ void NuzlockeInitRulesForNewGame(void)
 bool32 NuzlockeRuleEnabled(u32 rule)
 {
     return (gSaveBlock1Ptr->nuzlockeRuleFlags & rule) != 0;
+}
+
+// The three rules whose bits are stored inverted, read the way round they are
+// actually thought about. Keeping the inversion behind these means a save with
+// no flags at all -- one written before the rules menu existed -- answers TRUE
+// to all three, which is the behaviour it was played under.
+
+bool32 NuzlockeBattleStyleIsSet(void)
+{
+    return !NuzlockeRuleEnabled(NUZLOCKE_RULE_BATTLE_STYLE_SHIFT);
+}
+
+bool32 NuzlockeBagItemsAllowedInBattle(void)
+{
+    return NuzlockeRuleEnabled(NUZLOCKE_RULE_ALLOW_BAG_ITEMS);
+}
+
+bool32 NuzlockeLevelCapsEnabled(void)
+{
+    return !NuzlockeRuleEnabled(NUZLOCKE_RULE_NO_LEVEL_CAPS);
 }
 
 bool32 NuzlockeIsRunOver(void)

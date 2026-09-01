@@ -27,6 +27,7 @@
 #include "mail.h"
 #include "battle_records.h"
 #include "item.h"
+#include "key_system.h"
 #include "pokedex.h"
 #include "apprentice.h"
 #include "frontier_util.h"
@@ -91,12 +92,17 @@ static void InitPlayerTrainerId(void)
 // L=A isnt set here for some reason.
 static void SetDefaultOptions(void)
 {
-    gSaveBlock2Ptr->optionsTextSpeed = OPTIONS_TEXT_SPEED_MID;
+    // FAST rather than vanilla's MID: MID is no longer reachable from the menu.
+    gSaveBlock2Ptr->optionsTextSpeed = OPTIONS_TEXT_SPEED_FAST;
     gSaveBlock2Ptr->optionsWindowFrameType = 0;
     gSaveBlock2Ptr->optionsSound = OPTIONS_SOUND_MONO;
-    gSaveBlock2Ptr->optionsBattleStyle = OPTIONS_BATTLE_STYLE_SET; // Nuzlocke rule 5
     gSaveBlock2Ptr->optionsBattleSceneOff = FALSE;
     gSaveBlock2Ptr->regionMapZoom = FALSE;
+    // Key system: every key starts off, which for the exp modifier means 1x.
+    gSaveBlock2Ptr->keyExpModifier = KEY_EXP_MODIFIER_1X;
+    gSaveBlock2Ptr->keyInfiniteRareCandy = FALSE;
+    gSaveBlock2Ptr->keyRareCandyGranted = FALSE;
+    gSaveBlock2Ptr->keyInfiniteTMs = FALSE;
 }
 
 static void ClearPokedexFlags(void)
@@ -189,6 +195,13 @@ void NewGameInitData(void)
     gSaveBlock1Ptr->registeredItem = ITEM_NONE;
     ClearBag();
     NewGameInitPCItems();
+    // Key system: must follow ClearBag, which has just wiped the bottomless Rare
+    // Candy stack along with everything else. A key switched on at the main menu
+    // before NEW GAME was chosen would otherwise start the run with nothing to
+    // show for it. Encryption is no concern here for the same reason it is not
+    // for NewGameInitPCItems: the key is still zero throughout this function and
+    // the whole bag is re-encoded afterwards.
+    KeySystemSyncRareCandy();
     ClearPokeblocks();
     ClearDecorationInventories();
     InitEasyChatPhrases();

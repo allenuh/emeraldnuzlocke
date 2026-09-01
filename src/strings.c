@@ -1490,6 +1490,7 @@ const u8 gText_ButtonMode[] = _("BUTTON MODE");
 const u8 gText_TextSpeedSlow[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}SLOW");
 const u8 gText_TextSpeedMid[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}MID");
 const u8 gText_TextSpeedFast[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}FAST");
+const u8 gText_TextSpeedInstant[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}INSTANT");
 const u8 gText_BattleSceneOn[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}ON");
 const u8 gText_BattleSceneOff[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}OFF");
 const u8 gText_BattleStyleShift[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}SHIFT");
@@ -1501,6 +1502,30 @@ const u8 gText_FrameTypeNumber[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}");
 const u8 gText_ButtonTypeNormal[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}NORMAL");
 const u8 gText_ButtonTypeLR[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}LR");
 const u8 gText_ButtonTypeLEqualsA[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}L=A");
+// Key system. The choice strings carry the same colour prefix as the option
+// menu's, which the draw routine overwrites in place to highlight a selection.
+const u8 gText_KeySystem[] = _("KEY SYSTEM");
+const u8 gText_ExpModifier[] = _("EXP. MODIFIER");
+const u8 gText_InfiniteRareCandy[] = _("INF. RARE CANDY");
+const u8 gText_InfiniteTMs[] = _("INF. TMS");
+const u8 gText_ExpModifier0x[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}0×");
+const u8 gText_ExpModifierHalf[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}1/2×");
+const u8 gText_ExpModifier1x[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}1×");
+const u8 gText_ExpModifier2x[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}2×");
+const u8 gText_ExpModifier5x[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}5×");
+// Nuzlocke rules, chosen once at new-game time. The ON/OFF and SET/SHIFT rows
+// reuse the option menu's strings above.
+const u8 gText_NuzlockeRules[] = _("NUZLOCKE RULES");
+const u8 gText_ShinyClause[] = _("SHINY CLAUSE");
+const u8 gText_WhiteOut[] = _("WHITE OUT");
+const u8 gText_BattleMode[] = _("BATTLE MODE");
+const u8 gText_BagItems[] = _("BAG ITEMS");
+const u8 gText_LevelCaps[] = _("LEVEL CAPS");
+const u8 gText_NuzlockeStart[] = _("START");
+const u8 gText_WhiteOutEndRun[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}END RUN");
+const u8 gText_WhiteOutContinue[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}CONTINUE");
+const u8 gText_BagItemsAllowed[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}ALLOWED");
+const u8 gText_BagItemsBanned[] = _("{COLOR GREEN}{SHADOW LIGHT_GREEN}BANNED");
 const u8 gText_NumPlayerLink[] = _("{STR_VAR_1}P LINK");
 const u8 gText_BronzeCard[] = _("BRONZE");
 const u8 gText_CopperCard[] = _("COPPER");

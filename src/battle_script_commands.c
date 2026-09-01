@@ -326,6 +326,7 @@ static void Cmd_removeattackerstatus1(void);
 static void Cmd_finishaction(void);
 static void Cmd_finishturn(void);
 static void Cmd_trainerslideout(void);
+static void Cmd_trypickupmessage(void);
 
 void (*const gBattleScriptingCommandsTable[])(void) =
 {
@@ -577,7 +578,8 @@ void (*const gBattleScriptingCommandsTable[])(void) =
     [B_SCR_OP_REMOVEATTACKERSTATUS1]           = Cmd_removeattackerstatus1,                   //0xF5
     [B_SCR_OP_FINISHACTION]                    = Cmd_finishaction,                            //0xF6
     [B_SCR_OP_FINISHTURN]                      = Cmd_finishturn,                              //0xF7
-    [B_SCR_OP_TRAINERSLIDEOUT]                 = Cmd_trainerslideout                          //0xF8
+    [B_SCR_OP_TRAINERSLIDEOUT]                 = Cmd_trainerslideout,                         //0xF8
+    [B_SCR_OP_TRYPICKUPMESSAGE]                = Cmd_trypickupmessage,                        //0xF9
 };
 
 struct StatFractions
@@ -3365,6 +3367,23 @@ static void Cmd_getexp(void)
                 gBattleStruct->wildVictorySong++;
             }
 
+            // Nuzlocke rule 7: effort stays with whoever actually fought. Only
+            // experience is redirected by the level cap, so a Pokémon handed
+            // someone else's exp does not collect their EVs too.
+            //
+            // Key system: this sits above the zero-award check below rather than
+            // inside its else, because EVs are earned by fighting and not by the
+            // size of the award. With EXP. MODIFIER at 0x every award is zero and
+            // that check is the only path taken, so leaving MonGainEVs on the far
+            // side of it would make 0x mean "no exp and no EVs". The same now
+            // holds for a Pokémon standing on the level cap: it earns nothing and
+            // still collects its EVs, which is the rule the redirect was built on.
+            //
+            // NuzlockeMonEarnedExpNormally restricts this to slots that fought or
+            // held an Exp Share -- exactly the set vanilla awarded EVs to.
+            if (NuzlockeMonEarnedExpNormally(gBattleStruct->expGetterMonId, sentIn))
+                MonGainEVs(&gPlayerParty[gBattleStruct->expGetterMonId], gBattleMons[gBattlerFainted].species);
+
             if (gBattleMoveDamage == 0)
             {
                 *(&gBattleStruct->sentInPokes) >>= 1;
@@ -3400,12 +3419,6 @@ static void Cmd_getexp(void)
                 PREPARE_WORD_NUMBER_BUFFER(gBattleTextBuff3, 5, gBattleMoveDamage);
 
                 PrepareStringBattle(STRINGID_PKMNGAINEDEXP, gBattleStruct->expGetterBattlerId);
-
-                // Nuzlocke rule 7: effort stays with whoever actually fought.
-                // Only experience is redirected by the level cap, so a Pokémon
-                // handed someone else's exp does not collect their EVs too.
-                if (NuzlockeMonEarnedExpNormally(gBattleStruct->expGetterMonId, sentIn))
-                    MonGainEVs(&gPlayerParty[gBattleStruct->expGetterMonId], gBattleMons[gBattlerFainted].species);
 
                 gBattleStruct->sentInPokes >>= 1;
                 gBattleScripting.getexpState++;
@@ -9642,11 +9655,19 @@ static void Cmd_getsecretpowereffect(void)
     gBattlescriptCurrInstr++;
 }
 
+// Which party slots came away with something this battle, so the messages can be
+// printed after the fact. Only has to survive to the end of the battle script,
+// so it is deliberately not saved. The item itself is read back off the Pokémon
+// when the message is built rather than stored here.
+static EWRAM_DATA u8 sPickupMons = 0;
+
 static void Cmd_pickup(void)
 {
     s32 i;
     u16 species, heldItem;
     u8 ability;
+
+    sPickupMons = 0;
 
     if (InBattlePike())
     {
@@ -9672,6 +9693,7 @@ static void Cmd_pickup(void)
             {
                 heldItem = GetBattlePyramidPickupItemId();
                 SetMonData(&gPlayerParty[i], MON_DATA_HELD_ITEM, &heldItem);
+                sPickupMons |= gBitTable[i];
             }
         }
     }
@@ -9704,11 +9726,13 @@ static void Cmd_pickup(void)
                     if (sPickupProbabilities[j] > rand)
                     {
                         SetMonData(&gPlayerParty[i], MON_DATA_HELD_ITEM, &sPickupItems[lvlDivBy10 + j]);
+                        sPickupMons |= gBitTable[i];
                         break;
                     }
                     else if (rand == 99 || rand == 98)
                     {
                         SetMonData(&gPlayerParty[i], MON_DATA_HELD_ITEM, &sRarePickupItems[lvlDivBy10 + (99 - rand)]);
+                        sPickupMons |= gBitTable[i];
                         break;
                     }
                 }
@@ -9717,6 +9741,35 @@ static void Cmd_pickup(void)
     }
 
     gBattlescriptCurrInstr++;
+}
+
+// Buffers one "found an item" message for a Pokémon that picked something up,
+// and falls through so the script can print it; jumps once none are left. The
+// script loops back here, so one command covers a whole party's worth without
+// the battle script needing a counter of its own.
+//
+// Battler 0 is passed as the nickname's owner because it is on the player's
+// side, which is what decides the prefix -- a party Pokémon that never entered
+// the battle must not be announced as "the wild" or "the foe".
+static void Cmd_trypickupmessage(void)
+{
+    u32 i;
+
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        if (sPickupMons & gBitTable[i])
+        {
+            sPickupMons &= ~gBitTable[i];
+
+            PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, 0, i);
+            PREPARE_ITEM_BUFFER(gBattleTextBuff2, GetMonData(&gPlayerParty[i], MON_DATA_HELD_ITEM));
+
+            gBattlescriptCurrInstr += 5;
+            return;
+        }
+    }
+
+    gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
 }
 
 static void Cmd_docastformchangeanimation(void)
