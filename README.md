@@ -7,7 +7,8 @@ mechanics, rather than leaving it to the honor system. Built on the
 Nine rules are enforced in code — you cannot heal a dead Pokémon, catch a second Pokémon on a
 route, or over-level past the next gym leader, because the game will not let you. Alongside
 them are the conveniences a forced solo run needs: trade evolutions without a second player,
-free EV-lowering berries, and an optional set of assists for pace and grind.
+free EV-lowering berries, a summary page for the IVs and EVs you are stuck with, and an
+optional set of assists for pace and grind.
 
 See **[FEATURES.md](FEATURES.md)** for the full documentation.
 
@@ -23,6 +24,8 @@ See **[FEATURES.md](FEATURES.md)** for the full documentation.
 - **Quality-of-life changes** — instant text, running indoors, a "use another?" prompt when
   a Repel wears off, cut trees that stay cut, Pickup announcing its finds, and an indicator
   on the enemy's health bar telling you whether it counts as the route's catch.
+- **A STATS page in the summary** — a fifth page showing a Pokémon's IVs and EVs, neither of
+  which vanilla ever displays, plus stat names coloured by what its nature raises and lowers.
 - **LINK STONE** — an evolution stone that stands in for a trade, so Alakazam, Machamp,
   Gengar and the rest are reachable in a solo run.
 - **A Surplus Berries box** outside the Berry Master's house, giving away the EV-lowering

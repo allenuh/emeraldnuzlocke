@@ -256,6 +256,39 @@ under rules 3 and 4, before you commit a ball:
 It reuses the slot and silhouette of vanilla's "already caught" ball, so the three read as one
 set. Source: [`src/battle_interface.c`](src/battle_interface.c).
 
+### The STATS page
+
+A fifth page in a Pokémon's summary, between POKéMON SKILLS and BATTLE MOVES, reached with
+L/R or the D-pad like the others. It borrows the SKILLS page's layout and fills it with two
+stat boxes instead of one: **IV** on top, **EV** below, each showing all six stats.
+
+Neither number is visible anywhere in vanilla. In a nuzlocke you keep what you caught, so the
+IV spread of a route's one encounter is a fact you plan around rather than one you re-roll,
+and EVs matter more once the Surplus Berries make a spread correctable.
+
+The page is read-only and costs no save space — the values come straight off the Pokémon.
+Eggs cannot reach it, as with every page but the egg's own.
+
+### Nature-marked stats
+
+On both the SKILLS page and the new STATS page, the stat names are coloured by what the
+Pokémon's nature does to them:
+
+| | |
+| --- | --- |
+| **Red** | The nature raises this stat (×1.1) |
+| **Blue** | The nature lowers this stat (×0.9) |
+| **White** | Unaffected — and every stat of a neutral nature |
+
+HP is never coloured, since no nature touches it. The five neutral natures (HARDY, DOCILE,
+SERIOUS, BASHFUL, QUIRKY) leave the page looking exactly as it did.
+
+Vanilla prints the stat names once when the summary screen loads, which would have frozen the
+colours on whichever Pokémon you opened the screen with. They are now redrawn by the page
+itself, so the colours follow the Pokémon as you scroll the party with ↑/↓.
+
+Source: [`src/pokemon_summary_screen.c`](src/pokemon_summary_screen.c).
+
 ---
 
 ## 4. Menus

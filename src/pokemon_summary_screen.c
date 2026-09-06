@@ -50,6 +50,7 @@
 enum {
     PSS_PAGE_INFO,
     PSS_PAGE_SKILLS,
+    PSS_PAGE_STATS,
     PSS_PAGE_BATTLE_MOVES,
     PSS_PAGE_CONTEST_MOVES,
     PSS_PAGE_COUNT,
@@ -86,7 +87,19 @@ enum {
 #define PSS_LABEL_WINDOW_PORTRAIT_DEX_NUMBER 17
 #define PSS_LABEL_WINDOW_PORTRAIT_NICKNAME 18 // The upper name
 #define PSS_LABEL_WINDOW_PORTRAIT_SPECIES 19 // The lower name
-#define PSS_LABEL_WINDOW_END 20
+
+// Stats screen (IVs and EVs)
+#define PSS_LABEL_WINDOW_POKEMON_STATS_TITLE 20
+#define PSS_LABEL_WINDOW_POKEMON_STATS_IV_LEFT 21 // HP, Attack, Defense
+#define PSS_LABEL_WINDOW_POKEMON_STATS_IV_RIGHT 22 // Sp. Attack, Sp. Defense, Speed
+#define PSS_LABEL_WINDOW_POKEMON_STATS_EV_LEFT 23 // HP, Attack, Defense
+#define PSS_LABEL_WINDOW_POKEMON_STATS_EV_RIGHT 24 // Sp. Attack, Sp. Defense, Speed
+#define PSS_LABEL_WINDOW_END 25
+
+// sTextColors entries used to tint a stat name the Pokemon's nature raises or lowers
+#define PSS_COLOR_STAT_NORMAL 1
+#define PSS_COLOR_STAT_RAISED 2
+#define PSS_COLOR_STAT_LOWERED 3
 
 // Dynamic fields for the Pokémon Info page
 #define PSS_DATA_WINDOW_INFO_ORIGINAL_TRAINER 0
@@ -100,6 +113,12 @@ enum {
 #define PSS_DATA_WINDOW_SKILLS_STATS_LEFT 2 // HP, Attack, Defense
 #define PSS_DATA_WINDOW_SKILLS_STATS_RIGHT 3 // Sp. Attack, Sp. Defense, Speed
 #define PSS_DATA_WINDOW_EXP 4 // Exp, next level
+
+// Dynamic fields for the Pokémon Stats page
+#define PSS_DATA_WINDOW_STATS_IV_LEFT 0 // HP, Attack, Defense
+#define PSS_DATA_WINDOW_STATS_IV_RIGHT 1 // Sp. Attack, Sp. Defense, Speed
+#define PSS_DATA_WINDOW_STATS_EV_LEFT 2 // HP, Attack, Defense
+#define PSS_DATA_WINDOW_STATS_EV_RIGHT 3 // Sp. Attack, Sp. Defense, Speed
 
 // Dynamic fields for the Battle Moves and Contest Moves pages.
 #define PSS_DATA_WINDOW_MOVE_NAMES 0
@@ -245,6 +264,8 @@ static void PrintNotEggInfo(void);
 static void PrintEggInfo(void);
 static void PrintGenderSymbol(struct Pokemon *, u16);
 static void PrintPageNamesAndStats(void);
+static u8 GetNatureStatColor(u8);
+static void PrintStatNames(u8, u8);
 static void PutPageWindowTilemaps(u8);
 static void ClearPageWindowTilemaps(u8);
 static void RemoveWindowByIndex(u8);
@@ -276,6 +297,11 @@ static void PrintLeftColumnStats(void);
 static void BufferRightColumnStats(void);
 static void PrintRightColumnStats(void);
 static void PrintExpPointsNextLevel(void);
+static void Task_PrintStatsPage(u8);
+static void PrintStatsPageText(void);
+static void PrintIVColumns(void);
+static void PrintEVColumns(void);
+static void PrintStatColumn(u8, u8, u16, u16, u16);
 static void PrintBattleMoves(void);
 static void Task_PrintBattleMoves(u8);
 static void PrintMoveNameAndPP(u8);
@@ -586,6 +612,51 @@ static const struct WindowTemplate sSummaryTemplate[] =
         .paletteNum = 6,
         .baseBlock = 413,
     },
+    [PSS_LABEL_WINDOW_POKEMON_STATS_TITLE] = {
+        .bg = 0,
+        .tilemapLeft = 0,
+        .tilemapTop = 0,
+        .width = 11,
+        .height = 2,
+        .paletteNum = 6,
+        .baseBlock = 700,
+    },
+    [PSS_LABEL_WINDOW_POKEMON_STATS_IV_LEFT] = {
+        .bg = 0,
+        .tilemapLeft = 10,
+        .tilemapTop = 4,
+        .width = 6,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 722,
+    },
+    [PSS_LABEL_WINDOW_POKEMON_STATS_IV_RIGHT] = {
+        .bg = 0,
+        .tilemapLeft = 22,
+        .tilemapTop = 4,
+        .width = 5,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 758,
+    },
+    [PSS_LABEL_WINDOW_POKEMON_STATS_EV_LEFT] = {
+        .bg = 0,
+        .tilemapLeft = 10,
+        .tilemapTop = 11,
+        .width = 6,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 788,
+    },
+    [PSS_LABEL_WINDOW_POKEMON_STATS_EV_RIGHT] = {
+        .bg = 0,
+        .tilemapLeft = 22,
+        .tilemapTop = 11,
+        .width = 5,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 824,
+    },
     [PSS_LABEL_WINDOW_END] = DUMMY_WIN_TEMPLATE
 };
 static const struct WindowTemplate sPageInfoTemplate[] =
@@ -675,6 +746,45 @@ static const struct WindowTemplate sPageSkillsTemplate[] =
         .baseBlock = 543,
     },
 };
+static const struct WindowTemplate sPageStatsTemplate[] =
+{
+    [PSS_DATA_WINDOW_STATS_IV_LEFT] = {
+        .bg = 0,
+        .tilemapLeft = 16,
+        .tilemapTop = 4,
+        .width = 6,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 449,
+    },
+    [PSS_DATA_WINDOW_STATS_IV_RIGHT] = {
+        .bg = 0,
+        .tilemapLeft = 27,
+        .tilemapTop = 4,
+        .width = 3,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 485,
+    },
+    [PSS_DATA_WINDOW_STATS_EV_LEFT] = {
+        .bg = 0,
+        .tilemapLeft = 16,
+        .tilemapTop = 11,
+        .width = 6,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 503,
+    },
+    [PSS_DATA_WINDOW_STATS_EV_RIGHT] = {
+        .bg = 0,
+        .tilemapLeft = 27,
+        .tilemapTop = 11,
+        .width = 3,
+        .height = 6,
+        .paletteNum = 6,
+        .baseBlock = 539,
+    },
+};
 static const struct WindowTemplate sPageMovesTemplate[] = // This is used for both battle and contest moves
 {
     [PSS_DATA_WINDOW_MOVE_NAMES] = {
@@ -731,6 +841,7 @@ static void (*const sTextPrinterFunctions[])(void) =
 {
     [PSS_PAGE_INFO] = PrintInfoPageText,
     [PSS_PAGE_SKILLS] = PrintSkillsPageText,
+    [PSS_PAGE_STATS] = PrintStatsPageText,
     [PSS_PAGE_BATTLE_MOVES] = PrintBattleMoves,
     [PSS_PAGE_CONTEST_MOVES] = PrintContestMoves
 };
@@ -739,6 +850,7 @@ static const TaskFunc sTextPrinterTasks[] =
 {
     [PSS_PAGE_INFO] = Task_PrintInfoPage,
     [PSS_PAGE_SKILLS] = Task_PrintSkillsPage,
+    [PSS_PAGE_STATS] = Task_PrintStatsPage,
     [PSS_PAGE_BATTLE_MOVES] = Task_PrintBattleMoves,
     [PSS_PAGE_CONTEST_MOVES] = Task_PrintContestMoves
 };
@@ -1343,39 +1455,43 @@ static bool8 DecompressGraphics(void)
         sMonSummaryScreen->switchCounter++;
         break;
     case 4:
-        LZDecompressWram(gSummaryPage_BattleMoves_Tilemap, sMonSummaryScreen->bgTilemapBuffers[PSS_PAGE_BATTLE_MOVES][1]);
+        LZDecompressWram(gSummaryPage_Stats_Tilemap, sMonSummaryScreen->bgTilemapBuffers[PSS_PAGE_STATS][1]);
         sMonSummaryScreen->switchCounter++;
         break;
     case 5:
-        LZDecompressWram(gSummaryPage_ContestMoves_Tilemap, sMonSummaryScreen->bgTilemapBuffers[PSS_PAGE_CONTEST_MOVES][1]);
+        LZDecompressWram(gSummaryPage_BattleMoves_Tilemap, sMonSummaryScreen->bgTilemapBuffers[PSS_PAGE_BATTLE_MOVES][1]);
         sMonSummaryScreen->switchCounter++;
         break;
     case 6:
+        LZDecompressWram(gSummaryPage_ContestMoves_Tilemap, sMonSummaryScreen->bgTilemapBuffers[PSS_PAGE_CONTEST_MOVES][1]);
+        sMonSummaryScreen->switchCounter++;
+        break;
+    case 7:
         LoadCompressedPalette(gSummaryScreen_Pal, BG_PLTT_ID(0), 8 * PLTT_SIZE_4BPP);
         LoadPalette(&gPPTextPalette, BG_PLTT_ID(8) + 1, PLTT_SIZEOF(16 - 1));
         sMonSummaryScreen->switchCounter++;
         break;
-    case 7:
+    case 8:
         LoadCompressedSpriteSheet(&sSpriteSheet_MoveTypes);
         sMonSummaryScreen->switchCounter++;
         break;
-    case 8:
+    case 9:
         LoadCompressedSpriteSheet(&sMoveSelectorSpriteSheet);
         sMonSummaryScreen->switchCounter++;
         break;
-    case 9:
+    case 10:
         LoadCompressedSpriteSheet(&sStatusIconsSpriteSheet);
         sMonSummaryScreen->switchCounter++;
         break;
-    case 10:
+    case 11:
         LoadCompressedSpritePalette(&sStatusIconsSpritePalette);
         sMonSummaryScreen->switchCounter++;
         break;
-    case 11:
+    case 12:
         LoadCompressedSpritePalette(&sMoveSelectorSpritePal);
         sMonSummaryScreen->switchCounter++;
         break;
-    case 12:
+    case 13:
         LoadCompressedPalette(gMoveTypes_Pal, OBJ_PLTT_ID(13), 3 * PLTT_SIZE_4BPP);
         sMonSummaryScreen->switchCounter = 0;
         return TRUE;
@@ -1551,7 +1667,7 @@ static void Task_HandleInput(u8 taskId)
         }
         else if (JOY_NEW(A_BUTTON))
         {
-            if (sMonSummaryScreen->currPageIndex != PSS_PAGE_SKILLS)
+            if (sMonSummaryScreen->currPageIndex != PSS_PAGE_SKILLS && sMonSummaryScreen->currPageIndex != PSS_PAGE_STATS)
             {
                 if (sMonSummaryScreen->currPageIndex == PSS_PAGE_INFO)
                 {
@@ -1857,7 +1973,8 @@ static void PssScrollLeftEnd(u8 taskId) // display left
         SetBgAttribute(1, BG_ATTR_PRIORITY, 2);
         ScheduleBgCopyTilemapToVram(1);
     }
-    if (sMonSummaryScreen->currPageIndex > 1)
+    // The info page lives permanently on BG3, so it never needs preloading into the hidden BG.
+    if (sMonSummaryScreen->currPageIndex > PSS_PAGE_SKILLS)
     {
         SetBgTilemapBuffer(data[1], sMonSummaryScreen->bgTilemapBuffers[sMonSummaryScreen->currPageIndex - 1][0]);
         ChangeBgX(data[1], 0x10000, BG_COORD_SET);
@@ -2829,16 +2946,56 @@ static void PrintAOrBButtonIcon(u8 windowId, bool8 bButton, u32 x)
     BlitBitmapToWindow(windowId, button, x, 0, 16, 16);
 }
 
+// Returns the sTextColors id a stat name should be drawn in: red if the Pokemon's nature
+// raises that stat, blue if it lowers it, otherwise the ordinary white label colour.
+// gNatureStatTable is indexed Attack/Defense/Speed/Sp.Atk/Sp.Def, i.e. by STAT_* minus one,
+// which is not the order the stats are displayed in.
+static u8 GetNatureStatColor(u8 stat)
+{
+    s8 mod = gNatureStatTable[sMonSummaryScreen->summary.nature][stat - 1];
+
+    if (mod > 0)
+        return PSS_COLOR_STAT_RAISED;
+    if (mod < 0)
+        return PSS_COLOR_STAT_LOWERED;
+    return PSS_COLOR_STAT_NORMAL;
+}
+
+// Draws the six stat names into one pair of label windows. Called from the page text
+// printers rather than PrintPageNamesAndStats so the nature colors follow the Pokemon
+// when the player scrolls through the party.
+static void PrintStatNames(u8 leftWindowId, u8 rightWindowId)
+{
+    int statsXPos;
+
+    FillWindowPixelBuffer(leftWindowId, PIXEL_FILL(0));
+    FillWindowPixelBuffer(rightWindowId, PIXEL_FILL(0));
+
+    // HP is never affected by nature
+    statsXPos = 6 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_HP4, 42);
+    PrintTextOnWindow(leftWindowId, gText_HP4, statsXPos, 1, 0, PSS_COLOR_STAT_NORMAL);
+    statsXPos = 6 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_Attack3, 42);
+    PrintTextOnWindow(leftWindowId, gText_Attack3, statsXPos, 17, 0, GetNatureStatColor(STAT_ATK));
+    statsXPos = 6 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_Defense3, 42);
+    PrintTextOnWindow(leftWindowId, gText_Defense3, statsXPos, 33, 0, GetNatureStatColor(STAT_DEF));
+    statsXPos = 2 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_SpAtk4, 36);
+    PrintTextOnWindow(rightWindowId, gText_SpAtk4, statsXPos, 1, 0, GetNatureStatColor(STAT_SPATK));
+    statsXPos = 2 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_SpDef4, 36);
+    PrintTextOnWindow(rightWindowId, gText_SpDef4, statsXPos, 17, 0, GetNatureStatColor(STAT_SPDEF));
+    statsXPos = 2 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_Speed2, 36);
+    PrintTextOnWindow(rightWindowId, gText_Speed2, statsXPos, 33, 0, GetNatureStatColor(STAT_SPEED));
+}
+
 static void PrintPageNamesAndStats(void)
 {
     int stringXPos;
     int iconXPos;
-    int statsXPos;
 
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_INFO_TITLE, gText_PkmnInfo, 2, 1, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_TITLE, gText_PkmnSkills, 2, 1, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_BATTLE_MOVES_TITLE, gText_BattleMoves, 2, 1, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_CONTEST_MOVES_TITLE, gText_ContestMoves, 2, 1, 0, 1);
+    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_STATS_TITLE, gText_PkmnStats, 2, 1, 0, 1);
 
     stringXPos = GetStringRightAlignXOffset(FONT_NORMAL, gText_Cancel2, 62);
     iconXPos = stringXPos - 16;
@@ -2863,18 +3020,6 @@ static void PrintPageNamesAndStats(void)
 
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_INFO_RENTAL, gText_RentalPkmn, 0, 1, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_INFO_TYPE, gText_TypeSlash, 0, 1, 0, 0);
-    statsXPos = 6 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_HP4, 42);
-    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT, gText_HP4, statsXPos, 1, 0, 1);
-    statsXPos = 6 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_Attack3, 42);
-    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT, gText_Attack3, statsXPos, 17, 0, 1);
-    statsXPos = 6 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_Defense3, 42);
-    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT, gText_Defense3, statsXPos, 33, 0, 1);
-    statsXPos = 2 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_SpAtk4, 36);
-    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT, gText_SpAtk4, statsXPos, 1, 0, 1);
-    statsXPos = 2 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_SpDef4, 36);
-    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT, gText_SpDef4, statsXPos, 17, 0, 1);
-    statsXPos = 2 + GetStringCenterAlignXOffset(FONT_NORMAL, gText_Speed2, 36);
-    PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT, gText_Speed2, statsXPos, 33, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_EXP, gText_ExpPoints, 6, 1, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_EXP, gText_NextLv, 6, 17, 0, 1);
     PrintTextOnWindow(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATUS, gText_Status, 2, 1, 0, 1);
@@ -2892,6 +3037,7 @@ static void PutPageWindowTilemaps(u8 page)
     ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_TITLE);
     ClearWindowTilemap(PSS_LABEL_WINDOW_BATTLE_MOVES_TITLE);
     ClearWindowTilemap(PSS_LABEL_WINDOW_CONTEST_MOVES_TITLE);
+    ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_TITLE);
 
     switch (page)
     {
@@ -2907,6 +3053,13 @@ static void PutPageWindowTilemaps(u8 page)
         PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT);
         PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT);
         PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_EXP);
+        break;
+    case PSS_PAGE_STATS:
+        PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_TITLE);
+        PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_IV_LEFT);
+        PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_IV_RIGHT);
+        PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_EV_LEFT);
+        PutWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_EV_RIGHT);
         break;
     case PSS_PAGE_BATTLE_MOVES:
         PutWindowTilemap(PSS_LABEL_WINDOW_BATTLE_MOVES_TITLE);
@@ -2956,6 +3109,12 @@ static void ClearPageWindowTilemaps(u8 page)
         ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT);
         ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT);
         ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_SKILLS_EXP);
+        break;
+    case PSS_PAGE_STATS:
+        ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_IV_LEFT);
+        ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_IV_RIGHT);
+        ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_EV_LEFT);
+        ClearWindowTilemap(PSS_LABEL_WINDOW_POKEMON_STATS_EV_RIGHT);
         break;
     case PSS_PAGE_BATTLE_MOVES:
         if (sMonSummaryScreen->mode == SUMMARY_MODE_SELECT_MOVE)
@@ -3300,6 +3459,7 @@ static void PrintEggMemo(void)
 
 static void PrintSkillsPageText(void)
 {
+    PrintStatNames(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT, PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT);
     PrintHeldItemName();
     PrintRibbonCount();
     BufferLeftColumnStats();
@@ -3337,6 +3497,9 @@ static void Task_PrintSkillsPage(u8 taskId)
         PrintExpPointsNextLevel();
         break;
     case 8:
+        PrintStatNames(PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_LEFT, PSS_LABEL_WINDOW_POKEMON_SKILLS_STATS_RIGHT);
+        break;
+    case 9:
         DestroyTask(taskId);
         return;
     }
@@ -3455,6 +3618,86 @@ static void PrintExpPointsNextLevel(void)
     ConvertIntToDecimalStringN(gStringVar1, expToNextLevel, STR_CONV_MODE_RIGHT_ALIGN, 6);
     x = GetStringRightAlignXOffset(FONT_NORMAL, gStringVar1, 42) + 2;
     PrintTextOnWindow(windowId, gStringVar1, x, 17, 0, 0);
+}
+
+// Prints three values down one column of an IV/EV box, right-aligned the way the
+// Skills page aligns its stat numbers. The stat order matches the labels printed by
+// PrintPageNamesAndStats, which is not the order of the MON_DATA_* enum.
+static void PrintStatColumn(u8 templateId, u8 width, u16 top, u16 middle, u16 bottom)
+{
+    u8 windowId = AddWindowFromTemplateList(sPageStatsTemplate, templateId);
+    u16 values[3] = {top, middle, bottom};
+    u8 i;
+
+    for (i = 0; i < ARRAY_COUNT(values); i++)
+    {
+        int x;
+
+        ConvertIntToDecimalStringN(gStringVar1, values[i], STR_CONV_MODE_LEFT_ALIGN, 3);
+        x = GetStringRightAlignXOffset(FONT_NORMAL, gStringVar1, width * 8 - 4);
+        PrintTextOnWindow(windowId, gStringVar1, x, i * 16 + 1, 0, 0);
+    }
+}
+
+static void PrintIVColumns(void)
+{
+    struct Pokemon *mon = &sMonSummaryScreen->currentMon;
+
+    PrintStatColumn(PSS_DATA_WINDOW_STATS_IV_LEFT, 6,
+                    GetMonData(mon, MON_DATA_HP_IV),
+                    GetMonData(mon, MON_DATA_ATK_IV),
+                    GetMonData(mon, MON_DATA_DEF_IV));
+    PrintStatColumn(PSS_DATA_WINDOW_STATS_IV_RIGHT, 3,
+                    GetMonData(mon, MON_DATA_SPATK_IV),
+                    GetMonData(mon, MON_DATA_SPDEF_IV),
+                    GetMonData(mon, MON_DATA_SPEED_IV));
+}
+
+static void PrintEVColumns(void)
+{
+    struct Pokemon *mon = &sMonSummaryScreen->currentMon;
+
+    PrintStatColumn(PSS_DATA_WINDOW_STATS_EV_LEFT, 6,
+                    GetMonData(mon, MON_DATA_HP_EV),
+                    GetMonData(mon, MON_DATA_ATK_EV),
+                    GetMonData(mon, MON_DATA_DEF_EV));
+    PrintStatColumn(PSS_DATA_WINDOW_STATS_EV_RIGHT, 3,
+                    GetMonData(mon, MON_DATA_SPATK_EV),
+                    GetMonData(mon, MON_DATA_SPDEF_EV),
+                    GetMonData(mon, MON_DATA_SPEED_EV));
+}
+
+static void PrintStatsPageText(void)
+{
+    PrintStatNames(PSS_LABEL_WINDOW_POKEMON_STATS_IV_LEFT, PSS_LABEL_WINDOW_POKEMON_STATS_IV_RIGHT);
+    PrintStatNames(PSS_LABEL_WINDOW_POKEMON_STATS_EV_LEFT, PSS_LABEL_WINDOW_POKEMON_STATS_EV_RIGHT);
+    PrintIVColumns();
+    PrintEVColumns();
+}
+
+static void Task_PrintStatsPage(u8 taskId)
+{
+    s16 *data = gTasks[taskId].data;
+
+    switch (data[0])
+    {
+    case 1:
+        PrintStatNames(PSS_LABEL_WINDOW_POKEMON_STATS_IV_LEFT, PSS_LABEL_WINDOW_POKEMON_STATS_IV_RIGHT);
+        break;
+    case 2:
+        PrintIVColumns();
+        break;
+    case 3:
+        PrintStatNames(PSS_LABEL_WINDOW_POKEMON_STATS_EV_LEFT, PSS_LABEL_WINDOW_POKEMON_STATS_EV_RIGHT);
+        break;
+    case 4:
+        PrintEVColumns();
+        break;
+    case 5:
+        DestroyTask(taskId);
+        return;
+    }
+    data[0]++;
 }
 
 static void PrintBattleMoves(void)
