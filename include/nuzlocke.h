@@ -43,6 +43,13 @@ enum {
 bool32 IsSpeciesFamilyOwned(u16 species);
 bool32 IsAreaEncounterSpent(u8 mapSec);
 
+// What the encounter tracker shows for an area: what was met there and whether
+// it was kept. NULL for an area whose chance has not been spent. Whether a
+// species would be refused as a duplicate is deliberately not in here -- it is
+// derived live from the Pokedex by IsSpeciesFamilyOwned, so it stays true as the
+// party changes and costs no save space.
+const struct NuzlockeAreaRecord *GetAreaEncounterRecord(u8 mapSec);
+
 // Called when a wild battle starts from an encounter table.
 void NuzlockeEvaluateWildEncounter(void);
 u8 GetNuzlockeEncounterStatus(void);

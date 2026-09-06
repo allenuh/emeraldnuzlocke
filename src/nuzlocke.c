@@ -37,7 +37,11 @@ STATIC_ASSERT(offsetof(struct SaveBlock1, trainerHillTimes) == 0x3718, NuzlockeS
 STATIC_ASSERT(NUZLOCKE_AREA_BYTES * 8 >= MAPSEC_COUNT, NuzlockeAreaBitfieldCoversAllAreas);
 // Every further nuzlocke field is taken from the same filler, so it is the
 // filler running out -- not the offsets moving -- that would bite first.
-STATIC_ASSERT(NUZLOCKE_AREA_BYTES + 2 <= 0x180, NuzlockeSaveFieldsFitInFiller);
+STATIC_ASSERT(NUZLOCKE_AREA_BYTES + 5
+              + (NUZLOCKE_AREA_RECORD_COUNT * sizeof(struct NuzlockeAreaRecord)) <= 0x180,
+              NuzlockeSaveFieldsFitInFiller);
+// The tracker never has more areas to log than gWildMonHeaders has map sections.
+STATIC_ASSERT(NUZLOCKE_AREA_RECORD_COUNT >= 64, NuzlockeAreaRecordsCoverEveryArea);
 
 // The 5 Poké Balls the rival hands over in Birch's Lab are the point where the
 // player can first comply with the catching rules at all. Before that, Routes
@@ -114,6 +118,9 @@ void NuzlockeMarkFaintedPartyMons(void)
 // encounter time rather than re-read at battle end, so it cannot go stale.
 static EWRAM_DATA u8 sEncounterStatus = NUZLOCKE_ENCOUNTER_EXEMPT;
 static EWRAM_DATA u8 sEncounterMapSec = MAPSEC_NONE;
+// Captured at encounter time for the same reason the map section is: by the time
+// the battle unwinds, gEnemyParty may hold something else entirely.
+static EWRAM_DATA u16 sEncounterSpecies = SPECIES_NONE;
 
 bool32 IsAreaEncounterSpent(u8 mapSec)
 {
@@ -129,6 +136,54 @@ static void MarkAreaEncounterSpent(u8 mapSec)
         return;
 
     gSaveBlock1Ptr->nuzlockeAreaEncounterSpent[mapSec / 8] |= 1 << (mapSec % 8);
+}
+
+//
+// The encounter tracker's log. Records are found by the map section they hold
+// rather than by their position, and a record is written once -- when the area's
+// chance is spent -- so a later encounter in the same area cannot overwrite it.
+//
+
+const struct NuzlockeAreaRecord *GetAreaEncounterRecord(u8 mapSec)
+{
+    u32 i;
+
+    for (i = 0; i < NUZLOCKE_AREA_RECORD_COUNT; i++)
+    {
+        const struct NuzlockeAreaRecord *record = &gSaveBlock1Ptr->nuzlockeAreaRecords[i];
+
+        // The outcome, not the map section, is what marks a slot as used: an
+        // untouched slot is all zeroes, and zero is a real map section.
+        if (record->outcome != NUZLOCKE_AREA_OUTCOME_NOT_VISITED && record->mapSec == mapSec)
+            return record;
+    }
+
+    return NULL;
+}
+
+static void RecordAreaEncounter(u8 mapSec, u16 species, u8 outcome)
+{
+    u32 i;
+
+    if (mapSec >= MAPSEC_NONE || GetAreaEncounterRecord(mapSec) != NULL)
+        return;
+
+    for (i = 0; i < NUZLOCKE_AREA_RECORD_COUNT; i++)
+    {
+        struct NuzlockeAreaRecord *record = &gSaveBlock1Ptr->nuzlockeAreaRecords[i];
+
+        if (record->outcome == NUZLOCKE_AREA_OUTCOME_NOT_VISITED)
+        {
+            record->mapSec = mapSec;
+            record->species = species;
+            record->outcome = outcome;
+            return;
+        }
+    }
+
+    // Nowhere to put it. There is a slot for every area in gWildMonHeaders, so
+    // this is unreachable; the log simply stops growing rather than trampling
+    // something if that ever stops being true.
 }
 
 // Walks back down an evolution line to its first stage. The loop is bounded
@@ -211,11 +266,13 @@ void NuzlockeEvaluateWildEncounter(void)
     {
         sEncounterStatus = NUZLOCKE_ENCOUNTER_EXEMPT;
         sEncounterMapSec = MAPSEC_NONE;
+        sEncounterSpecies = SPECIES_NONE;
         return;
     }
 
     species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL);
     sEncounterMapSec = gMapHeader.regionMapSectionId;
+    sEncounterSpecies = species;
 
     if (IsAreaEncounterSpent(sEncounterMapSec))
         sEncounterStatus = NUZLOCKE_ENCOUNTER_AREA_SPENT;
@@ -321,10 +378,23 @@ void NuzlockeFaintTrophyCatch(struct Pokemon *mon)
 void NuzlockeFinishWildEncounter(void)
 {
     if (sEncounterStatus == NUZLOCKE_ENCOUNTER_COUNTS)
+    {
         MarkAreaEncounterSpent(sEncounterMapSec);
+        // Logged on the same test that spends the chance, which is what keeps
+        // the log honest without any extra conditions: a duplicate never spends
+        // and so never overwrites the area's real encounter, and neither does a
+        // shiny the clause rescued -- it did not pay for the area either.
+        //
+        // gBattleOutcome is settled long before the battle unwinds this far.
+        RecordAreaEncounter(sEncounterMapSec, sEncounterSpecies,
+                            gBattleOutcome == B_OUTCOME_CAUGHT
+                                ? NUZLOCKE_AREA_OUTCOME_CAUGHT
+                                : NUZLOCKE_AREA_OUTCOME_MISSED);
+    }
 
     sEncounterStatus = NUZLOCKE_ENCOUNTER_EXEMPT;
     sEncounterMapSec = MAPSEC_NONE;
+    sEncounterSpecies = SPECIES_NONE;
 }
 
 //

@@ -21,6 +21,33 @@
 // Nuzlocke rule 3: one bit per region map section in SaveBlock1.
 #define NUZLOCKE_AREA_BYTES ((MAPSEC_COUNT + 7) / 8)
 
+// The encounter tracker's log. One record per area the player has had a
+// counting encounter in; 64 is every area in gWildMonHeaders, so it cannot
+// overflow.
+#define NUZLOCKE_AREA_RECORD_COUNT 64
+
+// How an area's one encounter ended. NOT_VISITED is what an empty slot reads
+// as, and is also what a save written before the tracker existed reports for
+// every area -- the filler these records came from is zero there, and a zeroed
+// record has mapSec == MAPSEC_LITTLEROOT_TOWN, which is why the empty test is
+// on the outcome rather than the map section.
+enum
+{
+    NUZLOCKE_AREA_OUTCOME_NOT_VISITED,
+    NUZLOCKE_AREA_OUTCOME_CAUGHT,
+    NUZLOCKE_AREA_OUTCOME_MISSED,
+};
+
+// Self-describing rather than indexed by a position in the tracker's area list:
+// adding or removing an encounter table later shifts that list, and a record
+// that knew itself only by position would then be read against the wrong area.
+struct NuzlockeAreaRecord
+{
+    /*0x0*/ u8 mapSec;
+    /*0x1*/ u8 outcome; // NUZLOCKE_AREA_OUTCOME_*
+    /*0x2*/ u16 species;
+};
+
 // Prevent cross-jump optimization.
 #define BLOCK_CROSS_JUMP asm("");
 
@@ -1090,7 +1117,18 @@ struct SaveBlock1
     // Both live in SaveBlock1 so ClearSav1 resets them on NEW GAME for free.
     /*0x35B3*/ u8 nuzlockeRuleFlags;
     /*0x35B4*/ u8 nuzlockeRunOver;
-    /*0x35B5*/ u8 unused_35B5[0x180 - NUZLOCKE_AREA_BYTES - 2];
+    // NUZLOCKE_AREA_BYTES is odd, so the fields above end on 0x35B5 and the
+    // record array cannot start there: it aligns to 4, not to the 2 its widest
+    // member would suggest. The compiler inserts these three bytes either way --
+    // spelling them out is what keeps the offsets below honest, and the
+    // STATIC_ASSERT on trainerHillTimes is what catches it when they are not.
+    /*0x35B5*/ u8 padding_35B5[3];
+    // The encounter tracker's log: what was met in each area whose chance has
+    // been spent, and whether it was kept. Written once per area, read only by
+    // the tracker screen. Same filler as the fields above.
+    /*0x35B8*/ struct NuzlockeAreaRecord nuzlockeAreaRecords[NUZLOCKE_AREA_RECORD_COUNT];
+    /*0x36B8*/ u8 unused_36B8[0x180 - NUZLOCKE_AREA_BYTES - 5
+                              - (NUZLOCKE_AREA_RECORD_COUNT * sizeof(struct NuzlockeAreaRecord))];
     /*0x3718*/ u32 trainerHillTimes[NUM_TRAINER_HILL_MODES];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;

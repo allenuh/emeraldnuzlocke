@@ -1540,6 +1540,22 @@ const u8 gText_GameTime[] = _("Game time"); // Unused
 const u8 gText_RTCTime[] = _("RTC time"); // Unused
 const u8 gText_UpdatedTime[] = _("Updated time"); // Unused
 const u8 gText_MenuPokedex[] = _("POKéDEX");
+// "ENCOUNTERS" measures 60px and the start menu leaves 48, so the row is named
+// for what it lists instead. The screen's own header spells it out in full.
+const u8 gText_MenuEncounters[] = _("ROUTES");
+
+// The encounter tracker.
+const u8 gText_EncounterTracker[] = _("ENCOUNTERS");
+const u8 gText_EncounterSlash[] = _("/");
+const u8 gText_EncounterGotAway[] = _("GOT AWAY");
+const u8 gText_EncounterCaught[] = _("CAUGHT");
+const u8 gText_EncounterOwned[] = _("OWNED");
+const u8 gText_EncounterGrass[] = _("GRASS");
+const u8 gText_EncounterSurf[] = _("SURF");
+const u8 gText_EncounterRockSmash[] = _("ROCK SMASH");
+const u8 gText_EncounterOldRod[] = _("OLD ROD");
+const u8 gText_EncounterGoodRod[] = _("GOOD ROD");
+const u8 gText_EncounterSuperRod[] = _("SUPER ROD");
 const u8 gText_MenuPokemon[] = _("POKéMON");
 const u8 gText_MenuBag[] = _("BAG");
 const u8 gText_MenuPokenav[] = _("POKéNAV");

@@ -3,6 +3,7 @@
 #include "battle_pyramid.h"
 #include "battle_pyramid_bag.h"
 #include "bg.h"
+#include "encounter_tracker.h"
 #include "event_data.h"
 #include "event_object_movement.h"
 #include "event_object_lock.h"
@@ -51,6 +52,7 @@
 enum
 {
     MENU_ACTION_POKEDEX,
+    MENU_ACTION_ENCOUNTERS,
     MENU_ACTION_POKEMON,
     MENU_ACTION_BAG,
     MENU_ACTION_POKENAV,
@@ -98,6 +100,7 @@ static bool8 StartMenuPokeNavCallback(void);
 static bool8 StartMenuPlayerNameCallback(void);
 static bool8 StartMenuSaveCallback(void);
 static bool8 StartMenuOptionCallback(void);
+static bool8 StartMenuEncountersCallback(void);
 static bool8 StartMenuExitCallback(void);
 static bool8 StartMenuSafariZoneRetireCallback(void);
 static bool8 StartMenuLinkModePlayerNameCallback(void);
@@ -182,6 +185,7 @@ static const struct WindowTemplate sWindowTemplate_PyramidPeak = {
 static const struct MenuAction sStartMenuItems[] =
 {
     [MENU_ACTION_POKEDEX]         = {gText_MenuPokedex, {.u8_void = StartMenuPokedexCallback}},
+    [MENU_ACTION_ENCOUNTERS]      = {gText_MenuEncounters, {.u8_void = StartMenuEncountersCallback}},
     [MENU_ACTION_POKEMON]         = {gText_MenuPokemon, {.u8_void = StartMenuPokemonCallback}},
     [MENU_ACTION_BAG]             = {gText_MenuBag,     {.u8_void = StartMenuBagCallback}},
     [MENU_ACTION_POKENAV]         = {gText_MenuPokenav, {.u8_void = StartMenuPokeNavCallback}},
@@ -322,6 +326,14 @@ static void BuildNormalStartMenu(void)
     {
         AddStartMenuAction(MENU_ACTION_POKEMON);
     }
+    // Gated on the same flag as the catching rules themselves: before the Poké
+    // Balls no area can have spent its chance, so the tracker would have nothing
+    // to show. It also keeps the menu at eight rows until then, so the padding
+    // this row spends is only given up once there is a reason to.
+    if (FlagGet(FLAG_ADVENTURE_STARTED) == TRUE)
+    {
+        AddStartMenuAction(MENU_ACTION_ENCOUNTERS);
+    }
 
     AddStartMenuAction(MENU_ACTION_BAG);
 
@@ -446,6 +458,15 @@ static void RemoveExtraStartMenuWindows(void)
     }
 }
 
+// How far below the window's top edge the first row sits.
+//
+// Vanilla's 9px of padding is what a ninth action spends to get on screen: nine
+// rows at the font's natural 16px pitch come to exactly the 144px the frame
+// leaves, with nothing over. Nothing clips at either count -- the ninth row's
+// glyphs end on the last pixel of the window -- but with nine actions the top
+// and bottom rows do sit flush against the frame.
+#define START_MENU_TEXT_TOP ((sNumStartMenuActions * 2) + 2 > MAX_START_MENU_HEIGHT ? 0 : 9)
+
 static bool32 PrintStartMenuActions(s8 *pIndex, u32 count)
 {
     s8 index = *pIndex;
@@ -454,12 +475,12 @@ static bool32 PrintStartMenuActions(s8 *pIndex, u32 count)
     {
         if (sStartMenuItems[sCurrentStartMenuActions[index]].func.u8_void == StartMenuPlayerNameCallback)
         {
-            PrintPlayerNameOnWindow(GetStartMenuWindowId(), sStartMenuItems[sCurrentStartMenuActions[index]].text, 8, (index << 4) + 9);
+            PrintPlayerNameOnWindow(GetStartMenuWindowId(), sStartMenuItems[sCurrentStartMenuActions[index]].text, 8, (index << 4) + START_MENU_TEXT_TOP);
         }
         else
         {
             StringExpandPlaceholders(gStringVar4, sStartMenuItems[sCurrentStartMenuActions[index]].text);
-            AddTextPrinterParameterized(GetStartMenuWindowId(), FONT_NORMAL, gStringVar4, 8, (index << 4) + 9, TEXT_SKIP_DRAW, NULL);
+            AddTextPrinterParameterized(GetStartMenuWindowId(), FONT_NORMAL, gStringVar4, 8, (index << 4) + START_MENU_TEXT_TOP, TEXT_SKIP_DRAW, NULL);
         }
 
         index++;
@@ -508,7 +529,7 @@ static bool32 InitStartMenuStep(void)
             sInitStartMenuData[0]++;
         break;
     case 5:
-        sStartMenuCursorPos = InitMenuNormal(GetStartMenuWindowId(), FONT_NORMAL, 0, 9, 16, sNumStartMenuActions, sStartMenuCursorPos);
+        sStartMenuCursorPos = InitMenuNormal(GetStartMenuWindowId(), FONT_NORMAL, 0, START_MENU_TEXT_TOP, 16, sNumStartMenuActions, sStartMenuCursorPos);
         CopyWindowToVram(GetStartMenuWindowId(), COPYWIN_MAP);
         return TRUE;
     }
@@ -736,6 +757,23 @@ static bool8 StartMenuOptionCallback(void)
         RemoveExtraStartMenuWindows();
         CleanupOverworldWindowsAndTilemaps();
         SetMainCallback2(CB2_InitOptionMenu); // Display option menu
+        gMain.savedCallback = CB2_ReturnToFieldWithOpenMenu;
+
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static bool8 StartMenuEncountersCallback(void)
+{
+    if (!gPaletteFade.active)
+    {
+        PlayRainStoppingSoundEffect();
+        RemoveExtraStartMenuWindows();
+        CleanupOverworldWindowsAndTilemaps();
+        gMain.state = 0;
+        SetMainCallback2(CB2_InitEncounterTracker);
         gMain.savedCallback = CB2_ReturnToFieldWithOpenMenu;
 
         return TRUE;

@@ -247,6 +247,18 @@ extern const u8 gText_SaveFailed[];
 
 // menu texts
 extern const u8 gText_MenuPokedex[];
+extern const u8 gText_MenuEncounters[];
+extern const u8 gText_EncounterTracker[];
+extern const u8 gText_EncounterSlash[];
+extern const u8 gText_EncounterGotAway[];
+extern const u8 gText_EncounterCaught[];
+extern const u8 gText_EncounterOwned[];
+extern const u8 gText_EncounterGrass[];
+extern const u8 gText_EncounterSurf[];
+extern const u8 gText_EncounterRockSmash[];
+extern const u8 gText_EncounterOldRod[];
+extern const u8 gText_EncounterGoodRod[];
+extern const u8 gText_EncounterSuperRod[];
 extern const u8 gText_MenuPokemon[];
 extern const u8 gText_MenuBag[];
 extern const u8 gText_MenuPokenav[];

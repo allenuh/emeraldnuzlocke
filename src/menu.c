@@ -495,7 +495,19 @@ u8 GetPlayerTextSpeedDelay(void)
 u8 AddStartMenuWindow(u8 numActions)
 {
     if (sStartMenuWindowId == WINDOW_NONE)
-        sStartMenuWindowId = AddWindowParameterized(0, 22, 1, 7, (numActions * 2) + 2, 15, 0x139);
+    {
+        // The window sits at row 1 and its frame owns rows 0 and 19, so 18 tiles
+        // is every row the screen has to give. Eight actions and their 2 tiles of
+        // padding come to exactly that; a ninth fits only by giving the padding
+        // up, which is what the cap does. Rows keep their full 16px pitch either
+        // way -- see START_MENU_TEXT_TOP in start_menu.c for the other half.
+        u8 height = (numActions * 2) + 2;
+
+        if (height > MAX_START_MENU_HEIGHT)
+            height = MAX_START_MENU_HEIGHT;
+
+        sStartMenuWindowId = AddWindowParameterized(0, 22, 1, 7, height, 15, 0x139);
+    }
     return sStartMenuWindowId;
 }
 
