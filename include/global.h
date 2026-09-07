@@ -568,7 +568,8 @@ struct SaveBlock2
     /*0x91*/ u8 keyInfiniteRareCandy; // the bag's Rare Candy stack never runs out
     /*0x92*/ u8 keyRareCandyGranted;  // that stack came from the key, so turning it off can take it back
     /*0x93*/ u8 keyInfiniteTMs;       // a TM is taught but not spent
-    /*0x94*/ u8 unused_94[4];
+    /*0x94*/ u8 keyNoFlash;           // caves are lit, so no party slot is owed to Flash
+    /*0x95*/ u8 unused_95[3];
     /*0x98*/ struct Time localTimeOffset;
     /*0xA0*/ struct Time lastBerryTreeUpdate;
     /*0xA8*/ u32 gcnLinkFlags; // Read by Pokémon Colosseum/XD

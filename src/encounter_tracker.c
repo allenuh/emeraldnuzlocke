@@ -92,8 +92,13 @@ enum
 #define ICON_SUBPRIORITY 4
 #define BALL_SUBPRIORITY 8
 
-// One per map section in gWildMonHeaders -- the same bound the save records use.
-#define MAX_AREAS NUZLOCKE_AREA_RECORD_COUNT
+// One per map section shown in the area list. This is a display bound and no
+// longer the save bound: gWildMonHeaders alone already fills exactly
+// NUZLOCKE_AREA_RECORD_COUNT sections, and the areas that hold only a non-wild
+// encounter come on top of that. They need no record of their own, because
+// nothing found there ever spends an area's chance -- GetAreaEncounterRecord is
+// keyed by map section and simply has nothing to return for them.
+#define MAX_AREAS 80
 
 // Every species in an area, and under each of them a row per method it turns up
 // by. The Safari Zone sets the bound: 38 species over its four sections comes to
@@ -137,18 +142,44 @@ enum
 
 // Which of the header's four WildPokemonInfo pointers a method reads. They sit
 // consecutively, so one routine serves all four rather than being written out
-// four times.
+// four times. METHOD_NONE is the rows that read no table at all -- the ones
+// filled from sSpecialEncounters below.
 enum
 {
     METHOD_LAND,
     METHOD_WATER,
     METHOD_ROCK_SMASH,
     METHOD_FISHING,
+    METHOD_NONE,
 };
 
-// The six rows a species can be found under, in the order they are gathered and
-// emitted. Rock Smash shares Old Rod's brown: the palette has no second one, and
-// the two never appear close enough together to be confused.
+// The rows a species can be found under, in the order they are gathered and
+// emitted. Rock Smash shares Old Rod's brown and Trade shares Good Rod's purple:
+// the palette has no second tone of either, and no two rows sharing a hue ever
+// appear close enough together to be confused. Static wears the same grey a row
+// with nothing left to do wears, which is what was asked for and reads correctly
+// besides -- a static is never the encounter an area's chance is spent on.
+enum
+{
+    METHOD_ROW_GRASS,
+    METHOD_ROW_SURF,
+    METHOD_ROW_ROCK_SMASH,
+    METHOD_ROW_OLD_ROD,
+    METHOD_ROW_GOOD_ROD,
+    METHOD_ROW_SUPER_ROD,
+    METHOD_ROW_FOSSIL,
+    METHOD_ROW_STATIC,
+    METHOD_ROW_GIFT,
+    METHOD_ROW_TRADE,
+    METHOD_ROW_COUNT,
+};
+
+// The rows that come from sSpecialEncounters rather than from an encounter
+// table. A species carrying only these is not part of rules 3 and 4 at all,
+// which is what IsSpeciesSpecialOnly is for.
+#define SPECIAL_METHOD_BITS ((1 << METHOD_ROW_FOSSIL) | (1 << METHOD_ROW_STATIC) \
+                           | (1 << METHOD_ROW_GIFT)   | (1 << METHOD_ROW_TRADE))
+
 static const struct
 {
     const u8 *label;
@@ -159,17 +190,80 @@ static const struct
     u8 lastSlot;
 } sMethodRows[] =
 {
-    { gText_EncounterGrass,     GREEN_LIGHT,  GREEN_DARK,  METHOD_LAND,       0, NUM_LAND_MONS_ENCOUNTER_SLOTS - 1 },
-    { gText_EncounterSurf,      BLUE_LIGHT,   BLUE_DARK,   METHOD_WATER,      0, NUM_WATER_MONS_ENCOUNTER_SLOTS - 1 },
-    { gText_EncounterRockSmash, BROWN_LIGHT,  BROWN_DARK,  METHOD_ROCK_SMASH, 0, NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS - 1 },
-    { gText_EncounterOldRod,    BROWN_LIGHT,  BROWN_DARK,  METHOD_FISHING,    OLD_ROD_FIRST_SLOT,   GOOD_ROD_FIRST_SLOT - 1 },
-    { gText_EncounterGoodRod,   PURPLE_LIGHT, PURPLE_DARK, METHOD_FISHING,    GOOD_ROD_FIRST_SLOT,  SUPER_ROD_FIRST_SLOT - 1 },
-    { gText_EncounterSuperRod,  RED_LIGHT,    RED_DARK,    METHOD_FISHING,    SUPER_ROD_FIRST_SLOT, NUM_FISHING_MONS_ENCOUNTER_SLOTS - 1 },
+    [METHOD_ROW_GRASS]      = { gText_EncounterGrass,     GREEN_LIGHT,  GREEN_DARK,   METHOD_LAND,       0, NUM_LAND_MONS_ENCOUNTER_SLOTS - 1 },
+    [METHOD_ROW_SURF]       = { gText_EncounterSurf,      BLUE_LIGHT,   BLUE_DARK,    METHOD_WATER,      0, NUM_WATER_MONS_ENCOUNTER_SLOTS - 1 },
+    [METHOD_ROW_ROCK_SMASH] = { gText_EncounterRockSmash, BROWN_LIGHT,  BROWN_DARK,   METHOD_ROCK_SMASH, 0, NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS - 1 },
+    [METHOD_ROW_OLD_ROD]    = { gText_EncounterOldRod,    BROWN_LIGHT,  BROWN_DARK,   METHOD_FISHING,    OLD_ROD_FIRST_SLOT,   GOOD_ROD_FIRST_SLOT - 1 },
+    [METHOD_ROW_GOOD_ROD]   = { gText_EncounterGoodRod,   PURPLE_LIGHT, PURPLE_DARK,  METHOD_FISHING,    GOOD_ROD_FIRST_SLOT,  SUPER_ROD_FIRST_SLOT - 1 },
+    [METHOD_ROW_SUPER_ROD]  = { gText_EncounterSuperRod,  RED_LIGHT,    RED_DARK,     METHOD_FISHING,    SUPER_ROD_FIRST_SLOT, NUM_FISHING_MONS_ENCOUNTER_SLOTS - 1 },
+    [METHOD_ROW_FOSSIL]     = { gText_EncounterFossil,    BROWN_LIGHT,  BROWN_DARK,   METHOD_NONE,       0, 0 },
+    [METHOD_ROW_STATIC]     = { gText_EncounterStatic,    COLOR_MUTED,  SHADOW_MUTED, METHOD_NONE,       0, 0 },
+    [METHOD_ROW_GIFT]       = { gText_EncounterGift,      BLUE_LIGHT,   BLUE_DARK,    METHOD_NONE,       0, 0 },
+    [METHOD_ROW_TRADE]      = { gText_EncounterTrade,     PURPLE_LIGHT, PURPLE_DARK,  METHOD_NONE,       0, 0 },
+};
+
+// Everything a Hoenn run can obtain that no encounter table mentions.
+//
+// This is the second source of truth the rest of the screen is built to avoid,
+// and it has to be one: these exist only as script commands and trade table
+// entries, with no equivalent of gWildMonHeaders to walk. Every row below was
+// read off the scripts rather than from memory, and can be re-derived with
+//
+//     grep -rn "givemon SPECIES_\|giveegg SPECIES_\|setwildbattle SPECIES_" data/maps
+//
+// plus sIngameTrades in src/data/trade.h for the four trades. The area is the
+// map's own region map section -- the same location the summary screen shows a
+// Pokemon as having been met at -- so Registeel is filed under Ancient Tomb
+// rather than under the route it is entered from, and Castform under Route 119
+// rather than a Weather Institute of its own.
+//
+// Deliberately not listed: Sudowoodo, Groudon, Kyogre, the Battle Frontier
+// Meowth trade, the post-game Johto starters, the Mystery Gift event legendaries
+// and the roaming Latias/Latios.
+//
+// Feebas is the one entry that is not a special method. Its Route 119 spots are
+// picked by their own system rather than from the fishing table, but it is an
+// ordinary wild encounter in every way that matters here -- it can be fished by
+// any of the three rods and it does spend the route's chance -- so it carries
+// the rod rows and behaves like the rest of the table everywhere downstream.
+static const struct
+{
+    u8 mapSec;
+    u16 species;
+    u16 methods;
+} sSpecialEncounters[] =
+{
+    { MAPSEC_LITTLEROOT_TOWN, SPECIES_TREECKO,   1 << METHOD_ROW_GIFT },
+    { MAPSEC_LITTLEROOT_TOWN, SPECIES_TORCHIC,   1 << METHOD_ROW_GIFT },
+    { MAPSEC_LITTLEROOT_TOWN, SPECIES_MUDKIP,    1 << METHOD_ROW_GIFT },
+    { MAPSEC_LAVARIDGE_TOWN,  SPECIES_WYNAUT,    1 << METHOD_ROW_GIFT },
+    { MAPSEC_RUSTBORO_CITY,   SPECIES_LILEEP,    1 << METHOD_ROW_FOSSIL },
+    { MAPSEC_RUSTBORO_CITY,   SPECIES_ANORITH,   1 << METHOD_ROW_FOSSIL },
+    { MAPSEC_RUSTBORO_CITY,   SPECIES_SEEDOT,    1 << METHOD_ROW_TRADE },
+    { MAPSEC_FORTREE_CITY,    SPECIES_PLUSLE,    1 << METHOD_ROW_TRADE },
+    { MAPSEC_PACIFIDLOG_TOWN, SPECIES_HORSEA,    1 << METHOD_ROW_TRADE },
+    { MAPSEC_ROUTE_119,       SPECIES_FEEBAS,    (1 << METHOD_ROW_OLD_ROD) | (1 << METHOD_ROW_GOOD_ROD) | (1 << METHOD_ROW_SUPER_ROD) },
+    { MAPSEC_ROUTE_119,       SPECIES_CASTFORM,  1 << METHOD_ROW_GIFT },
+    { MAPSEC_ROUTE_119,       SPECIES_KECLEON,   1 << METHOD_ROW_STATIC },
+    { MAPSEC_ROUTE_120,       SPECIES_KECLEON,   1 << METHOD_ROW_STATIC },
+    { MAPSEC_NEW_MAUVILLE,    SPECIES_VOLTORB,   1 << METHOD_ROW_STATIC },
+    { MAPSEC_AQUA_HIDEOUT,    SPECIES_ELECTRODE, 1 << METHOD_ROW_STATIC },
+    { MAPSEC_DESERT_RUINS,    SPECIES_REGIROCK,  1 << METHOD_ROW_STATIC },
+    { MAPSEC_ISLAND_CAVE,     SPECIES_REGICE,    1 << METHOD_ROW_STATIC },
+    { MAPSEC_ANCIENT_TOMB,    SPECIES_REGISTEEL, 1 << METHOD_ROW_STATIC },
+    { MAPSEC_SKY_PILLAR,      SPECIES_RAYQUAZA,  1 << METHOD_ROW_STATIC },
 };
 
 struct EncounterTracker
 {
     u8 areaMapSecs[MAX_AREAS];
+    // What colour each area's row is drawn in, worked out once when the screen
+    // opens. IsAreaFullyOwned is by far the most expensive thing on this screen
+    // -- a walk of every encounter header per method per area, with a scan of the
+    // whole evolution table inside it -- and recomputing it on the way back from
+    // a detail view cost a visible hitch. Nothing that feeds it can change while
+    // the tracker is up, so once is enough.
+    u8 areaColors[MAX_AREAS];
     u8 areaCount;
     u8 areasCaught;
     u8 listTaskId;
@@ -191,7 +285,7 @@ struct EncounterTracker
     struct
     {
         u16 species;
-        u8 methods; // a bit per index into sMethodRows
+        u16 methods; // a bit per index into sMethodRows
     } species[MAX_DETAIL_SPECIES];
     u8 speciesCount;
     // Which visible row each icon belongs to, and the scroll offset they were
@@ -223,6 +317,7 @@ static void SpriteCB_BounceIcon(struct Sprite *sprite);
 static u8 *WriteRowColor(u8 *dest, u8 fg, u8 shadow);
 static void DrawHeader(void);
 static void DrawBgWindowFrames(void);
+static u8 GetAreaColor(u8 mapSec);
 
 // A superset of the option screens' palette: indices 0-7 are theirs verbatim,
 // so the header and frames look the same, and the eight slots they leave empty
@@ -372,45 +467,54 @@ static bool32 HeaderHasEncounters(const struct WildPokemonHeader *header)
         || header->fishingMonsInfo != NULL;
 }
 
-// Walks gWildMonHeaders the way GetCurrentMapWildMonHeaderId does, collecting
-// each distinct map section once, inserted in section order -- which already
-// runs in roughly the order the player travels.
+// Adds a map section to the area list if it is not already there, keeping the
+// list in section order -- which already runs in roughly the order the player
+// travels.
+static void AddArea(u8 mapSec)
+{
+    u32 i, insertAt;
+
+    if (mapSec >= MAPSEC_NONE || sTracker->areaCount >= MAX_AREAS)
+        return;
+
+    for (i = 0; i < sTracker->areaCount; i++)
+    {
+        if (sTracker->areaMapSecs[i] == mapSec)
+            return;
+    }
+
+    for (insertAt = 0; insertAt < sTracker->areaCount; insertAt++)
+    {
+        if (sTracker->areaMapSecs[insertAt] > mapSec)
+            break;
+    }
+
+    for (i = sTracker->areaCount; i > insertAt; i--)
+        sTracker->areaMapSecs[i] = sTracker->areaMapSecs[i - 1];
+
+    sTracker->areaMapSecs[insertAt] = mapSec;
+    sTracker->areaCount++;
+}
+
+// Walks gWildMonHeaders the way GetCurrentMapWildMonHeaderId does, then adds the
+// areas that only a non-wild encounter puts on the map.
 static void BuildAreaList(void)
 {
-    u32 i, j;
+    u32 i;
 
     sTracker->areaCount = 0;
     sTracker->areasCaught = 0;
 
     for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
     {
-        u8 mapSec = GetHeaderMapSec(&gWildMonHeaders[i]);
-        u32 insertAt;
-
-        if (mapSec >= MAPSEC_NONE || !HeaderHasEncounters(&gWildMonHeaders[i]))
-            continue;
-
-        for (j = 0; j < sTracker->areaCount; j++)
-        {
-            if (sTracker->areaMapSecs[j] == mapSec)
-                break;
-        }
-
-        if (j != sTracker->areaCount || sTracker->areaCount >= MAX_AREAS)
-            continue;
-
-        for (insertAt = 0; insertAt < sTracker->areaCount; insertAt++)
-        {
-            if (sTracker->areaMapSecs[insertAt] > mapSec)
-                break;
-        }
-
-        for (j = sTracker->areaCount; j > insertAt; j--)
-            sTracker->areaMapSecs[j] = sTracker->areaMapSecs[j - 1];
-
-        sTracker->areaMapSecs[insertAt] = mapSec;
-        sTracker->areaCount++;
+        if (HeaderHasEncounters(&gWildMonHeaders[i]))
+            AddArea(GetHeaderMapSec(&gWildMonHeaders[i]));
     }
+
+    // The areas that hold only a gift, a trade, a fossil or a static have no
+    // encounter header to have been picked up above, so they are added here.
+    for (i = 0; i < ARRAY_COUNT(sSpecialEncounters); i++)
+        AddArea(sSpecialEncounters[i].mapSec);
 
     for (i = 0; i < sTracker->areaCount; i++)
     {
@@ -419,6 +523,11 @@ static void BuildAreaList(void)
         if (record != NULL && record->outcome == NUZLOCKE_AREA_OUTCOME_CAUGHT)
             sTracker->areasCaught++;
     }
+
+    // Worked out once, here, rather than on every return from a detail view --
+    // see the comment on areaColors.
+    for (i = 0; i < sTracker->areaCount; i++)
+        sTracker->areaColors[i] = GetAreaColor(sTracker->areaMapSecs[i]);
 }
 
 //
@@ -438,6 +547,9 @@ static bool32 IsAreaFullyOwned(u8 mapSec)
 
     for (m = 0; m < ARRAY_COUNT(sMethodRows); m++)
     {
+        if (sMethodRows[m].method == METHOD_NONE)
+            continue;
+
         for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
         {
             const struct WildPokemonInfo *info = GetHeaderMethodInfo(&gWildMonHeaders[i], sMethodRows[m].method);
@@ -464,43 +576,59 @@ static bool32 IsAreaFullyOwned(u8 mapSec)
     return anySpecies;
 }
 
+// An area with no encounter tables at all -- one that only holds a gift, a
+// trade, a fossil or a static. Nothing there is part of rules 3 and 4, so there
+// is no catch to spend and nothing for the accent colour to be urging.
+static bool32 AreaHasWildEncounters(u8 mapSec)
+{
+    u32 i;
+
+    for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
+    {
+        if (HeaderHasEncounters(&gWildMonHeaders[i]) && GetHeaderMapSec(&gWildMonHeaders[i]) == mapSec)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 // Each area is coloured by whether its catch is still worth going for: green
-// once something was kept, grey once the chance was spent for nothing or once
-// every name there is already owned, and the accent orange while it is still
-// there to be taken.
+// once something was kept, grey once the chance was spent for nothing, once
+// every name there is already owned, or once it turns out there was never a
+// wild catch to make there, and the accent orange while it is still there to be
+// taken. Returns the light half of the pair; the dark half follows from it.
+static u8 GetAreaColor(u8 mapSec)
+{
+    const struct NuzlockeAreaRecord *record = GetAreaEncounterRecord(mapSec);
+
+    if (record != NULL)
+        return (record->outcome == NUZLOCKE_AREA_OUTCOME_CAUGHT) ? GREEN_LIGHT : COLOR_MUTED;
+
+    if (!AreaHasWildEncounters(mapSec) || IsAreaFullyOwned(mapSec))
+        return COLOR_MUTED;
+
+    return COLOR_ACCENT;
+}
+
 static void BuildAreaListRows(void)
 {
     u32 i;
 
     for (i = 0; i < sTracker->areaCount; i++)
     {
-        u8 mapSec = sTracker->areaMapSecs[i];
-        const struct NuzlockeAreaRecord *record = GetAreaEncounterRecord(mapSec);
-        u8 fg = COLOR_ACCENT;
-        u8 shadow = SHADOW_ACCENT;
+        u8 fg = sTracker->areaColors[i];
+        u8 shadow;
         u8 *dest;
 
-        if (record != NULL)
-        {
-            if (record->outcome == NUZLOCKE_AREA_OUTCOME_CAUGHT)
-            {
-                fg = GREEN_LIGHT;
-                shadow = GREEN_DARK;
-            }
-            else
-            {
-                fg = COLOR_MUTED;
-                shadow = SHADOW_MUTED;
-            }
-        }
-        else if (IsAreaFullyOwned(mapSec))
-        {
-            fg = COLOR_MUTED;
+        if (fg == GREEN_LIGHT)
+            shadow = GREEN_DARK;
+        else if (fg == COLOR_MUTED)
             shadow = SHADOW_MUTED;
-        }
+        else
+            shadow = SHADOW_ACCENT;
 
         dest = WriteRowColor(sTracker->rowText[i], fg, shadow);
-        GetMapName(dest, mapSec, 0);
+        GetMapName(dest, sTracker->areaMapSecs[i], 0);
         sTracker->items[i].name = sTracker->rowText[i];
         sTracker->items[i].id = i;
     }
@@ -587,9 +715,34 @@ static void AddSpeciesRow(u16 species, bool32 muted)
 // caught picked out and a miss leaves nothing picked out. While the chance is
 // still unspent, the names stay accented except the ones rule 4 would refuse
 // anyway, because the family is already owned.
+// Whether a species in the area being shown is reachable only by a gift, a
+// trade, a fossil or a static -- which is to say, whether rules 3 and 4 have
+// anything to say about it at all. Feebas is deliberately not one of these: it
+// carries the rod rows, because it really is Route 119's wild catch if taken.
+static bool32 IsSpeciesSpecialOnly(u16 species)
+{
+    u32 entry;
+
+    for (entry = 0; entry < sTracker->speciesCount; entry++)
+    {
+        if (sTracker->species[entry].species == species)
+            return (sTracker->species[entry].methods & ~SPECIAL_METHOD_BITS) == 0;
+    }
+
+    return FALSE;
+}
+
 static bool32 IsDetailSpeciesMuted(u16 species)
 {
-    const struct NuzlockeAreaRecord *record = GetAreaEncounterRecord(sTracker->detailMapSec);
+    const struct NuzlockeAreaRecord *record;
+
+    // A gift, a trade, a fossil or a static never spends the area's chance, so
+    // spending it elsewhere in the area says nothing about them. Only already
+    // owning one takes it off the list.
+    if (IsSpeciesSpecialOnly(species))
+        return IsSpeciesFamilyOwned(species);
+
+    record = GetAreaEncounterRecord(sTracker->detailMapSec);
 
     if (record != NULL)
     {
@@ -600,6 +753,32 @@ static bool32 IsDetailSpeciesMuted(u16 species)
     }
 
     return IsSpeciesFamilyOwned(species);
+}
+
+// Records that a species can be found here by the given rows, merging into the
+// entry already present if there is one. First appearance sets the order, so
+// the land species stay at the top where they are most likely to matter.
+static void AddGatheredSpecies(u16 species, u16 methods)
+{
+    u32 entry;
+
+    for (entry = 0; entry < sTracker->speciesCount; entry++)
+    {
+        if (sTracker->species[entry].species == species)
+            break;
+    }
+
+    if (entry == sTracker->speciesCount)
+    {
+        if (sTracker->speciesCount >= MAX_DETAIL_SPECIES)
+            return;
+
+        sTracker->species[entry].species = species;
+        sTracker->species[entry].methods = 0;
+        sTracker->speciesCount++;
+    }
+
+    sTracker->species[entry].methods |= methods;
 }
 
 // Every method a species turns up under in this area, gathered before any row is
@@ -614,6 +793,9 @@ static void GatherAreaSpecies(u8 mapSec)
 
     for (m = 0; m < ARRAY_COUNT(sMethodRows); m++)
     {
+        if (sMethodRows[m].method == METHOD_NONE)
+            continue;
+
         for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
         {
             const struct WildPokemonInfo *info = GetHeaderMethodInfo(&gWildMonHeaders[i], sMethodRows[m].method);
@@ -624,32 +806,22 @@ static void GatherAreaSpecies(u8 mapSec)
             for (slot = sMethodRows[m].firstSlot; slot <= sMethodRows[m].lastSlot; slot++)
             {
                 u16 species = info->wildPokemon[slot].species;
-                u32 entry;
 
                 if (species == SPECIES_NONE)
                     continue;
 
-                for (entry = 0; entry < sTracker->speciesCount; entry++)
-                {
-                    if (sTracker->species[entry].species == species)
-                        break;
-                }
-
-                if (entry == sTracker->speciesCount)
-                {
-                    if (sTracker->speciesCount >= MAX_DETAIL_SPECIES)
-                        continue;
-
-                    // First appearance sets the order, so the land species stay
-                    // at the top where they are most likely to matter.
-                    sTracker->species[entry].species = species;
-                    sTracker->species[entry].methods = 0;
-                    sTracker->speciesCount++;
-                }
-
-                sTracker->species[entry].methods |= 1 << m;
+                AddGatheredSpecies(species, 1 << m);
             }
         }
+    }
+
+    // The non-wild encounters last, so they sit below the species the area's
+    // tables can actually roll. One of them may name a species already gathered,
+    // in which case it only adds its row to the entry already there.
+    for (i = 0; i < ARRAY_COUNT(sSpecialEncounters); i++)
+    {
+        if (sSpecialEncounters[i].mapSec == mapSec)
+            AddGatheredSpecies(sSpecialEncounters[i].species, sSpecialEncounters[i].methods);
     }
 }
 
@@ -686,7 +858,10 @@ static void PrintDetailStatus(u8 windowId, u32 itemId, u8 y)
     if (itemId == (u32)LIST_HEADER || itemId == SPECIES_NONE)
         return;
 
-    record = GetAreaEncounterRecord(sTracker->detailMapSec);
+    // A species reachable only by a gift, a trade, a fossil or a static is never
+    // what an area's record is about, even if the two happen to name the same
+    // one, so OWNED is the only thing it can say.
+    record = IsSpeciesSpecialOnly(itemId) ? NULL : GetAreaEncounterRecord(sTracker->detailMapSec);
 
     if (record != NULL && record->species == itemId)
         text = (record->outcome == NUZLOCKE_AREA_OUTCOME_CAUGHT) ? gText_EncounterCaught : gText_EncounterGotAway;

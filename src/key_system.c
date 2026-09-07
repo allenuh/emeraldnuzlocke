@@ -8,6 +8,7 @@
 #include "menu.h"
 #include "option_menu.h"
 #include "option_screen.h"
+#include "overworld.h"
 #include "palette.h"
 #include "scanline_effect.h"
 #include "sprite.h"
@@ -28,12 +29,14 @@ STATIC_ASSERT(offsetof(struct SaveBlock2, localTimeOffset) == 0x98, KeySystemSav
 #define tExpModifier   data[1]
 #define tRareCandy     data[2]
 #define tInfiniteTMs   data[3]
+#define tNoFlash       data[4]
 
 enum
 {
     MENUITEM_EXP_MODIFIER,
     MENUITEM_RARE_CANDY,
     MENUITEM_INFINITE_TMS,
+    MENUITEM_NO_FLASH,
     MENUITEM_CANCEL,
     MENUITEM_COUNT,
 };
@@ -47,6 +50,7 @@ enum
 #define YPOS_EXP_MODIFIER (MENUITEM_EXP_MODIFIER * 16)
 #define YPOS_RARE_CANDY   (MENUITEM_RARE_CANDY * 16)
 #define YPOS_INFINITE_TMS (MENUITEM_INFINITE_TMS * 16)
+#define YPOS_NO_FLASH     (MENUITEM_NO_FLASH * 16)
 
 static void Task_KeySystemMenuFadeIn(u8 taskId);
 static void Task_KeySystemMenuProcessInput(u8 taskId);
@@ -59,6 +63,8 @@ static u8 RareCandy_ProcessInput(u8 selection);
 static void RareCandy_DrawChoices(u8 selection);
 static u8 InfiniteTMs_ProcessInput(u8 selection);
 static void InfiniteTMs_DrawChoices(u8 selection);
+static u8 NoFlash_ProcessInput(u8 selection);
+static void NoFlash_DrawChoices(u8 selection);
 static void DrawHeaderText(void);
 static void DrawKeySystemMenuTexts(void);
 static void DrawBgWindowFrames(void);
@@ -74,6 +80,7 @@ static const u8 *const sKeySystemMenuItemsNames[MENUITEM_COUNT] =
     [MENUITEM_EXP_MODIFIER] = gText_ExpModifier,
     [MENUITEM_RARE_CANDY]   = gText_InfiniteRareCandy,
     [MENUITEM_INFINITE_TMS] = gText_InfiniteTMs,
+    [MENUITEM_NO_FLASH]     = gText_NoFlash,
     [MENUITEM_CANCEL]       = gText_OptionMenuCancel,
 };
 
@@ -187,6 +194,11 @@ bool32 KeySystemInfiniteRareCandy(void)
 bool32 KeySystemInfiniteTMs(void)
 {
     return gSaveBlock2Ptr->keyInfiniteTMs != 0;
+}
+
+bool32 KeySystemNoFlash(void)
+{
+    return gSaveBlock2Ptr->keyNoFlash != 0;
 }
 
 void KeySystemSyncRareCandy(void)
@@ -307,10 +319,12 @@ void CB2_InitKeySystemMenu(void)
         gTasks[taskId].tExpModifier = GetExpModifierSetting();
         gTasks[taskId].tRareCandy = KeySystemInfiniteRareCandy();
         gTasks[taskId].tInfiniteTMs = KeySystemInfiniteTMs();
+        gTasks[taskId].tNoFlash = KeySystemNoFlash();
 
         ExpModifier_DrawChoices(gTasks[taskId].tExpModifier);
         RareCandy_DrawChoices(gTasks[taskId].tRareCandy);
         InfiniteTMs_DrawChoices(gTasks[taskId].tInfiniteTMs);
+        NoFlash_DrawChoices(gTasks[taskId].tNoFlash);
         HighlightKeySystemMenuItem(gTasks[taskId].tMenuSelection);
 
         CopyWindowToVram(WIN_OPTIONS, COPYWIN_FULL);
@@ -385,6 +399,13 @@ static void Task_KeySystemMenuProcessInput(u8 taskId)
             if (previousOption != gTasks[taskId].tInfiniteTMs)
                 InfiniteTMs_DrawChoices(gTasks[taskId].tInfiniteTMs);
             break;
+        case MENUITEM_NO_FLASH:
+            previousOption = gTasks[taskId].tNoFlash;
+            gTasks[taskId].tNoFlash = NoFlash_ProcessInput(gTasks[taskId].tNoFlash);
+
+            if (previousOption != gTasks[taskId].tNoFlash)
+                NoFlash_DrawChoices(gTasks[taskId].tNoFlash);
+            break;
         default:
             return;
         }
@@ -402,10 +423,20 @@ static void Task_KeySystemMenuSave(u8 taskId)
     gSaveBlock2Ptr->keyExpModifier = gTasks[taskId].tExpModifier;
     gSaveBlock2Ptr->keyInfiniteRareCandy = gTasks[taskId].tRareCandy;
     gSaveBlock2Ptr->keyInfiniteTMs = gTasks[taskId].tInfiniteTMs;
+    gSaveBlock2Ptr->keyNoFlash = gTasks[taskId].tNoFlash;
 
     // Acts on the values just written, so the bag matches the key the moment the
     // player leaves this screen rather than at the next load.
     KeySystemSyncRareCandy();
+
+    // A map's darkness is decided by SetDefaultFlashLevel when it loads, so a key
+    // toggled inside a cave would otherwise not take effect until the player left
+    // it. Recomputing here lets the scanline effect come back at the new level
+    // when the field is redrawn. Only on a cave map: anywhere else the level was
+    // set by something other than this function -- Dewford Gym sets its own from
+    // a script -- and recomputing would throw that away.
+    if (gMapHeader.cave)
+        SetDefaultFlashLevel();
 
     BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
     gTasks[taskId].func = Task_KeySystemMenuFadeOut;
@@ -493,6 +524,22 @@ static u8 InfiniteTMs_ProcessInput(u8 selection)
 static void InfiniteTMs_DrawChoices(u8 selection)
 {
     OptionScreen_DrawChoiceRow(WIN_OPTIONS, sOffOnChoices, ARRAY_COUNT(sOffOnChoices), selection, YPOS_INFINITE_TMS);
+}
+
+static u8 NoFlash_ProcessInput(u8 selection)
+{
+    if (JOY_NEW(DPAD_LEFT | DPAD_RIGHT))
+    {
+        selection ^= 1;
+        sArrowPressed = TRUE;
+    }
+
+    return selection;
+}
+
+static void NoFlash_DrawChoices(u8 selection)
+{
+    OptionScreen_DrawChoiceRow(WIN_OPTIONS, sOffOnChoices, ARRAY_COUNT(sOffOnChoices), selection, YPOS_NO_FLASH);
 }
 
 static void DrawHeaderText(void)

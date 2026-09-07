@@ -241,6 +241,28 @@ leave it solved.
 A Pokémon with the Pickup ability now tells you what it found, in a message after the battle,
 instead of leaving you to notice the held item later.
 
+### Visible Feebas spots
+
+Six of Route 119's 447 fishing spots hold Feebas, and vanilla gives you nothing to go on —
+you fish a tile, get a Carvanha, and move one step. The six spots are now drawn as **visibly
+darker water**, so you can see where to cast.
+
+They still move. The spots are picked from the Dewford trend phrase, so they reroll whenever
+the trend does, and the marks are recalculated every time you enter the route. Everything else
+is untouched: the darker tiles are the same water to surf, fish and dive on, and Feebas still
+appears only half the time you fish a correct one.
+
+### The Pokémon Center nurse
+
+Healing is three button presses shorter. The welcome — "Hello, and welcome to the POKéMON
+CENTER" and "We restore your tired POKéMON to full health" — is gone, so talking to the nurse
+opens on "Would you like to rest your POKéMON?", and the receipt afterwards is gone too, so the
+heal ends on "We hope to see you again!".
+
+You are also turned to face away from the counter as the last message appears. Holding A
+through a heal used to run straight into the next conversation; now it stops when the exchange
+does. Answering **no** leaves you facing the nurse, so changing your mind costs nothing.
+
 ### Encounter indicator
 
 The Poké Ball marker on a wild Pokémon's health bar tells you what the encounter is worth
@@ -301,19 +323,29 @@ grows past seven rows.
 
 ### KEY SYSTEM
 
-Under OPTION, reachable both from the title screen and mid-run from the START menu. Three
-opt-in assists, borrowed from Black 2 / White 2 by way of FRLG-Plus:
+Under OPTION, reachable both from the title screen and mid-run from the START menu. Four
+opt-in assists, the first three borrowed from Black 2 / White 2 by way of FRLG-Plus:
 
 | Key | Options | |
 | --- | --- | --- |
 | **EXP. MODIFIER** | `0× / ½× / 1× / 2× / 5×` | Scales battle experience |
 | **INF. RARE CANDY** | ON / OFF | Puts a Rare Candy in the bag that is never used up |
 | **INF. TMS** | ON / OFF | TMs are not consumed when taught, as in Gen 5 onwards |
+| **NO FLASH** | ON / OFF | Dark caves are lit, so no party slot has to carry the HM |
 
 At `0×`, Pokémon **still gain EVs normally** — it is a "train stats, don't level" mode, not a
 switch that turns off progression entirely.
 
-The level cap still applies on top of all three. `5×` experience is still clamped at the cap
+**NO FLASH** exists because in a nuzlocke a party slot spent on an HM mule is a slot the run
+cannot spare. Only four maps are actually dark — Granite Cave B1F and B2F, and Victory Road B1F
+and B2F — and with the key on they are lit and Flash is refused in the party menu. Two places
+that look like they should be affected are not: **Brawly's gym** keeps its darkness and its
+lights-up-as-you-win puzzle, and **Ancient Tomb** still accepts Flash, because there the move
+opens Registeel's chamber rather than lighting anything. The Battle Pyramid's darkness is a
+separate system and is untouched. Toggling the key while standing in a dark cave takes effect
+as soon as you close the menu.
+
+The level cap still applies on top of the first three. `5×` experience is still clamped at the cap
 and redirected to a party member with room, and Rare Candy still refuses to work at the cap.
 Switching a key off is clean: turning INF. RARE CANDY off takes back the candy it granted and
 leaves any you found or bought alone.
@@ -322,6 +354,41 @@ Neither the bottomless Rare Candy nor the free berries can be sold, since either
 unlimited money press.
 
 Source: [`src/key_system.c`](src/key_system.c).
+
+### ROUTES
+
+Under START, once the adventure has begun. Rules 3 and 4 have been enforced since the beginning,
+but the player could only ever see their consequences — which routes still had a catch to spend,
+and what was met on the ones that no longer did, were things the game knew and never said. This
+is the notebook, kept by the game.
+
+The first screen lists every area that can produce a Pokémon, coloured by whether its catch is
+still worth going for — **orange** still to be taken, **green** something kept, **grey** nothing
+left to do — with what was met there down the right-hand side. Selecting one opens that area's
+table: every species it can offer, the ways each turns up, and where each stands under the rules.
+
+The method under each species is colour-coded:
+
+| | | | |
+| --- | --- | --- | --- |
+| **GRASS** green | **SURF** blue | **ROCK SMASH** brown | **OLD ROD** brown |
+| **GOOD ROD** purple | **SUPER ROD** red | **FOSSIL** brown | **STATIC** grey |
+| **GIFT** blue | **TRADE** purple | | |
+
+The wild lists are read out of the game's own encounter tables rather than restated, so the
+screen cannot disagree with what the game actually rolls. The last four methods have no table to
+read — the starters, the fossils, the gift mons, the NPC trades and the statics exist only as
+script commands — so those are the one hand-written list on this screen, and they are marked
+under the area the summary screen would call the Pokémon's met location. Registeel is therefore
+filed under ANCIENT TOMB rather than the route it is entered from.
+
+**None of them spend an area's chance.** A gift or a static is always catchable, so it stays
+picked out even in an area whose wild encounter is long gone, and it only greys once you own the
+family. Route 119's **Feebas** is the exception that proves it: its spots are chosen by their own
+system rather than from the fishing table, but it is an ordinary wild catch in every other way,
+so it is listed under all three rods and does spend the route's chance.
+
+Source: [`src/encounter_tracker.c`](src/encounter_tracker.c).
 
 ---
 

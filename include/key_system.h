@@ -49,4 +49,10 @@ void KeySystemSyncRareCandy(void);
 // guard against selling.
 bool32 KeySystemInfiniteTMs(void);
 
+// NO FLASH: the four maps that set requires_flash -- Granite Cave B1F/B2F and
+// Victory Road B1F/B2F -- are lit, so no party slot has to carry the HM. Read by
+// SetDefaultFlashLevel, which runs before a map's ON_TRANSITION script, so
+// Dewford Gym still sets its own darkness afterwards and is unaffected.
+bool32 KeySystemNoFlash(void);
+
 #endif // GUARD_KEY_SYSTEM_H

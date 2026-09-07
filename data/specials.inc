@@ -549,6 +549,9 @@ gSpecials::
 	def_special TryPrepareRepelReuse
 	def_special UseRepelFromPrompt
 
+@ Showing Route 119's Feebas spots as darker water.
+	def_special MarkRoute119FeebasSpots
+
 @ The Surplus Berries box on Route 123. waitstate, because the shop takes over
 @ the screen and the script must not run on until it hands control back.
 	def_special OpenSurplusBerryShop, waitstate=1

@@ -1,7 +1,15 @@
 Route119_MapScripts::
 	map_script MAP_SCRIPT_ON_RESUME, Route119_OnResume
 	map_script MAP_SCRIPT_ON_TRANSITION, Route119_OnTransition
+	map_script MAP_SCRIPT_ON_LOAD, Route119_OnLoad
 	.byte 0
+
+@ ON_LOAD, not ON_TRANSITION: the map grid the Feebas marks are written into
+@ is not built until InitMap, which runs the transition script first and the
+@ load script after. This is where setmetatile works, for the same reason.
+Route119_OnLoad:
+	special MarkRoute119FeebasSpots
+	end
 
 Route119_OnResume:
 	call_if_set FLAG_SYS_CTRL_OBJ_DELETE, Route119_EventScript_TryRemoveKecleon
