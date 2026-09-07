@@ -5,6 +5,7 @@
 #include "field_effect.h"
 #include "fldeff.h"
 #include "gpu_regs.h"
+#include "key_system.h"
 #include "main.h"
 #include "overworld.h"
 #include "palette.h"
@@ -80,7 +81,12 @@ bool8 SetUpFieldMove_Flash(void)
         gPostMenuFieldCallback = SetUpPuzzleEffectRegisteel;
         return TRUE;
     }
-    else if (gMapHeader.cave == TRUE && !FlagGet(FLAG_SYS_USE_FLASH))
+    // Refused outright with the NO FLASH key on, and not merely pointless: the
+    // map is already at flash level 0, and EventScript_UseFlash would setflashlevel
+    // 1, darkening a cave the key had just lit. The Registeel branch above is
+    // deliberately not guarded -- Flash opens that chamber, and without it the
+    // Pokemon cannot be reached at all.
+    else if (gMapHeader.cave == TRUE && !FlagGet(FLAG_SYS_USE_FLASH) && !KeySystemNoFlash())
     {
         gFieldCallback2 = FieldCallback_PrepareFadeInFromMenu;
         gPostMenuFieldCallback = FieldCallback_Flash;

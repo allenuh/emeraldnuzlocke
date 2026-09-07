@@ -24,6 +24,7 @@
 #include "gpu_regs.h"
 #include "heal_location.h"
 #include "io_reg.h"
+#include "key_system.h"
 #include "link.h"
 #include "link_rfu.h"
 #include "load_save.h"
@@ -971,7 +972,12 @@ bool32 Overworld_IsBikingAllowed(void)
 // Flash level of 8 is fully black
 void SetDefaultFlashLevel(void)
 {
-    if (!gMapHeader.cave)
+    // The NO FLASH key lights every cave that would have needed the HM. This runs
+    // before RunOnTransitionMapScript, so a map that sets its own level from a
+    // script still wins -- which is how Dewford Gym stays dark.
+    if (KeySystemNoFlash())
+        gSaveBlock1Ptr->flashLevel = 0;
+    else if (!gMapHeader.cave)
         gSaveBlock1Ptr->flashLevel = 0;
     else if (FlagGet(FLAG_SYS_USE_FLASH))
         gSaveBlock1Ptr->flashLevel = 1;

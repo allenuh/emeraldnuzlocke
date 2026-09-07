@@ -178,6 +178,96 @@ static void FeebasSeedRng(u16 seed)
     sFeebasRngValue = seed;
 }
 
+// Route 119's six Feebas spots are drawn in a darker blue so they can be seen
+// rather than fished for tile by tile. Each darkened metatile is a copy of the
+// one it replaces with the water repalettised, so behaviour, collision, layer
+// type and shoreline art are all unchanged -- which matters more than it looks:
+// GetFeebasFishingSpotId numbers the spots by walking the map and counting
+// surfable tiles, so a replacement that read as anything else would renumber
+// every spot after it and move Feebas somewhere the marks do not point.
+static const u16 sFeebasSpotMetatiles[][2] =
+{
+    // normal, darkened
+    {  44, 792 }, {  52, 793 }, {  60, 794 }, { 285, 795 }, { 293, 796 },
+    { 300, 797 }, { 301, 798 }, { 368, 799 }, { 369, 800 }, { 372, 801 },
+    { 376, 802 }, { 377, 803 }, { 385, 804 }, { 392, 805 }, { 393, 806 },
+    { 394, 807 }, { 400, 808 }, { 402, 809 }, { 403, 810 }, { 408, 811 },
+    { 410, 812 }, { 614, 813 }, { 615, 814 },
+};
+
+static u16 GetDarkenedWaterMetatile(u16 metatileId)
+{
+    u32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sFeebasSpotMetatiles); i++)
+    {
+        if (sFeebasSpotMetatiles[i][0] == metatileId)
+            return sFeebasSpotMetatiles[i][1];
+    }
+    return MAPGRID_UNDEFINED;
+}
+
+// Called from Route119_OnLoad. It has to be the load script and not the transition
+// one: the map grid this writes into is built by InitMap, which runs the transition
+// script before it and the load script after -- the same reason setmetatile is only
+// ever used from ON_LOAD. Nothing has been drawn yet at that point, so no redraw is
+// needed, and running on every entry keeps the marks in step with the Dewford trend
+// as it rerolls the spots.
+void MarkRoute119FeebasSpots(void)
+{
+    u16 feebasSpots[NUM_FEEBAS_SPOTS];
+    u16 spotId = 0;
+    u32 i;
+    s16 x, y;
+
+    // The same draw CheckFeebas makes, so the marks land on the spots that will
+    // actually produce a Feebas. Duplicates are possible and left alone, exactly
+    // as they are there -- some seeds genuinely have fewer than six spots.
+    FeebasSeedRng(gSaveBlock1Ptr->dewfordTrends[0].rand);
+    for (i = 0; i != NUM_FEEBAS_SPOTS;)
+    {
+        feebasSpots[i] = FeebasRandom() % NUM_FISHING_SPOTS;
+        if (feebasSpots[i] == 0)
+            feebasSpots[i] = NUM_FISHING_SPOTS;
+
+        if (feebasSpots[i] < 1 || feebasSpots[i] >= 4)
+            i++;
+    }
+
+    // One walk of the whole map reproduces GetFeebasFishingSpotId's numbering:
+    // its per-section starting points are just cumulative counts of this same
+    // sequence, so counting straight through arrives at the same ids.
+    for (y = 0; y < gMapHeader.mapLayout->height; y++)
+    {
+        for (x = 0; x < gMapHeader.mapLayout->width; x++)
+        {
+            u16 dark;
+            u8 behavior = MapGridGetMetatileBehaviorAt(x + MAP_OFFSET, y + MAP_OFFSET);
+
+            if (MetatileBehavior_IsSurfableAndNotWaterfall(behavior) != TRUE)
+                continue;
+
+            spotId++;
+            for (i = 0; i < NUM_FEEBAS_SPOTS; i++)
+            {
+                if (spotId != feebasSpots[i])
+                    continue;
+
+                dark = GetDarkenedWaterMetatile(MapGridGetMetatileIdAt(x + MAP_OFFSET, y + MAP_OFFSET));
+                if (dark != MAPGRID_UNDEFINED)
+                {
+                    // Collision comes from the argument rather than being kept,
+                    // so it has to be carried over or the tile becomes walkable.
+                    MapGridSetMetatileIdAt(x + MAP_OFFSET, y + MAP_OFFSET,
+                                           dark | PACK_COLLISION(MapGridGetCollisionAt(x + MAP_OFFSET, y + MAP_OFFSET)));
+                }
+                break;
+            }
+        }
+    }
+}
+
+
 // NUM_LAND_MONS_ENCOUNTER_SLOTS
 static u8 ChooseWildMonIndex_Land(void)
 {
